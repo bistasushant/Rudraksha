@@ -14,14 +14,14 @@ export default function Categories() {
     const scrollNext = () => {
         setActiveIndex((prev) => Math.min(prev + 1, CATEGORIES.length - 1));
         if (containerRef.current) {
-            containerRef.current.scrollBy({ left: 300, behavior: "smooth" });
+            containerRef.current.scrollTo({ left: 0, behavior: "smooth" });
         }
     };
 
     const scrollPrev = () => {
         setActiveIndex((prev) => Math.max(prev - 1, 0));
         if (containerRef.current) {
-            containerRef.current.scrollBy({ left: -300, behavior: "smooth" });
+            containerRef.current.scrollTo({ left: 0, behavior: "smooth" });
         }
     };
 
@@ -66,9 +66,9 @@ export default function Categories() {
                 </p>
                 <div
                     ref={containerRef}
-                    className="overflow-x-auto hide-scrollbar pb-4"
+                    className="overflow-hidden"
                 >
-                    <div className="flex space-x-6" style={{ minWidth: "min-content" }}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
                         {CATEGORIES.map((category, index) => (
                             <motion.div
                                 key={category.id}
@@ -77,7 +77,7 @@ export default function Categories() {
                                 viewport={{ once: true, margin: "-100px" }}
                                 transition={{ duration: 0.6, delay: index * 0.1 }}
                                 whileHover={{ y: -5 }}
-                                className="flex-shrink-0 w-64 md:w-72"
+                                className="w-full"
                             >
                                 <Link href={category.href}>
                                     <div className="relative rounded-lg overflow-hidden aspect-[4/5] mb-4 group">

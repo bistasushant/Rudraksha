@@ -30,7 +30,7 @@ export default function FAQ() {
                         </p>
                         <div className="relative aspect-square max-w-md">
                             <Image
-                                src="https://images.pexels.com/photos/7527053/pexels-photo-7527053.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1"
+                                src="/images/5muki.png"
                                 alt="Rudraksha beads"
                                 fill
                                 className="rounded-lg object-cover"

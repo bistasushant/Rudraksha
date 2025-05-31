@@ -42,6 +42,12 @@ export const CATEGORIES = [
     name: "Spiritual Jewelry",
     image: "/images/mala.png",
     href: "/shop/jewelry"
+  },
+  {
+    id: 5,
+    name: "Mala",
+    image: "/images/mala.png",
+    href: "/shop/jewelry"
   }
 ];
 
