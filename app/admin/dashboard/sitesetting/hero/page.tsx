@@ -7,14 +7,20 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
 import { useRouter } from "next/navigation";
+import NextImage from "next/image";
+
+interface HeroData {
+    videoUrl?: string;
+    title?: string;
+    subtitle?: string;
+    images?: string[];
+}
 
 export default function HeroPage() {
-    const [hero, setHero] = useState<{
-        videoUrl?: string;
-        title?: string;
-        subtitle?: string;
-    } | null>(null);
+    const [hero, setHero] = useState<HeroData | null>(null);
     const [previewVideo, setPreviewVideo] = useState<string | null>(null);
+    const [previewImages, setPreviewImages] = useState<string[]>(Array(4).fill(""));
+    const [selectedImageFiles, setSelectedImageFiles] = useState<(File | null)[]>(Array(4).fill(null));
     const [title, setTitle] = useState<string>("");
     const [subtitle, setSubtitle] = useState<string>("");
     const [isUploading, setIsUploading] = useState(false);
@@ -48,45 +54,30 @@ export default function HeroPage() {
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    console.error("Fetch Hero Error Response:", {
-                        status: response.status,
-                        statusText: response.statusText,
-                        errorData,
-                    });
                     throw new Error(errorData.message || `Error: ${response.status}`);
                 }
 
                 const result = await response.json();
-                if (!result.error && result.data) {
-                    // More defensive coding - check if hero exists in the response
-                    if (result.data.hero) {
-                        setHero({
-                            videoUrl: result.data.hero.videoUrl || "",
-                            title: result.data.hero.title || "",
-                            subtitle: result.data.hero.subtitle || "",
-                        });
-                        setTitle(result.data.hero.title || "");
-                        setSubtitle(result.data.hero.subtitle || "");
-                    } else {
-                        console.warn("Hero data missing in response:", result);
-                        // Set defaults when no hero data exists
-                        setHero({ videoUrl: "", title: "", subtitle: "" });
-                        setTitle("");
-                        setSubtitle("");
-                    }
+                if (!result.error && result.data?.hero) {
+                    setHero({
+                        videoUrl: result.data.hero.videoUrl || "",
+                        title: result.data.hero.title || "",
+                        subtitle: result.data.hero.subtitle || "",
+                        images: result.data.hero.images || [],
+                    });
+                    setTitle(result.data.hero.title || "");
+                    setSubtitle(result.data.hero.subtitle || "");
+                    setPreviewImages([...(result.data.hero.images || []), ...Array(4 - (result.data.hero.images?.length || 0)).fill("")]);
                 } else {
-                    console.error("API returned error or no data:", result);
-                    throw new Error(result.message || "Failed to load hero settings");
+                    setHero({ videoUrl: "", title: "", subtitle: "", images: [] });
+                    setTitle("");
+                    setSubtitle("");
+                    setPreviewImages(Array(4).fill(""));
                 }
             } catch (error) {
-                console.error("Error fetching hero settings:", {
-                    message: error instanceof Error ? error.message : "Unknown error",
-                    stack: error instanceof Error ? error.stack : undefined,
-                    fullError: error
-                });
+                console.error("Error fetching hero settings:", error);
                 toast.error("Failed to load hero settings", {
-                    description:
-                        error instanceof Error ? error.message : "Please try again later",
+                    description: error instanceof Error ? error.message : "Please try again later",
                 });
             } finally {
                 setIsLoading(false);
@@ -111,14 +102,19 @@ export default function HeroPage() {
             });
             router.push("/admin/dashboard");
         }
-    }, [admin, router]);
+
+        return () => {
+            if (previewVideo) URL.revokeObjectURL(previewVideo);
+            previewImages.forEach((url) => url && URL.revokeObjectURL(url));
+        };
+    }, [admin, router, previewVideo, previewImages]);
 
     const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
         const validTypes = ["video/mp4", "video/webm", "video/ogg"];
-        const maxSize = 25 * 1024 * 1024; // 25MB
+        const maxSize = 25 * 1024 * 1024;
 
         if (!validTypes.includes(file.type)) {
             toast.error("Invalid file type", {
@@ -134,21 +130,68 @@ export default function HeroPage() {
             return;
         }
 
-        const extension = file.name.split(".").pop()?.toLowerCase();
-        const expectedExtensions = ["mp4", "webm", "ogg"];
-        if (extension && !expectedExtensions.includes(extension)) {
-            toast.warning("File extension mismatch", {
-                description: `The file extension (.${extension}) does not match the expected formats (MP4, WebM, OGG). Ensure the file content matches its extension.`,
-            });
-        }
-
+        if (previewVideo) URL.revokeObjectURL(previewVideo);
         const previewUrl = URL.createObjectURL(file);
         setPreviewVideo(previewUrl);
     };
 
-    const clearPreview = () => {
+    const handleImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] || null;
+        if (!file) return;
+
+        const validTypes = ["image/jpeg", "image/png"];
+        const maxSize = 5 * 1024 * 1024;
+
+        if (!validTypes.includes(file.type)) {
+            toast.error("Invalid image type", {
+                description: "Please upload JPEG or PNG images.",
+            });
+            return;
+        }
+
+        if (file.size > maxSize) {
+            toast.error("Image too large", {
+                description: "Each image must be smaller than 5MB.",
+            });
+            return;
+        }
+
+        const newFiles = [...selectedImageFiles];
+        const newPreviews = [...previewImages];
+
+        if (newFiles[index]) {
+            // Replace existing file
+            if (newPreviews[index].startsWith("blob:")) {
+                URL.revokeObjectURL(newPreviews[index]);
+            }
+        }
+
+        newFiles[index] = file;
+        newPreviews[index] = URL.createObjectURL(file);
+
+        setSelectedImageFiles(newFiles);
+        setPreviewImages(newPreviews);
+    };
+
+    const clearVideoPreview = () => {
+        if (previewVideo) URL.revokeObjectURL(previewVideo);
         setPreviewVideo(null);
         if (videoInputRef.current) videoInputRef.current.value = "";
+    };
+
+    const clearImagePreview = (index: number) => {
+        const newFiles = [...selectedImageFiles];
+        const newPreviews = [...previewImages];
+
+        if (newPreviews[index] && newPreviews[index].startsWith("blob:")) {
+            URL.revokeObjectURL(newPreviews[index]);
+        }
+
+        newFiles[index] = null;
+        newPreviews[index] = hero?.images?.[index] || "";
+
+        setSelectedImageFiles(newFiles);
+        setPreviewImages(newPreviews);
     };
 
     const handleSave = async () => {
@@ -167,33 +210,45 @@ export default function HeroPage() {
             return;
         }
 
-        if (!previewVideo && !title && !subtitle) {
-            toast.error("No changes provided", {
-                description: "Please provide a video, title, or subtitle to update.",
-            });
-            return;
-        }
-
         setIsUploading(true);
 
         try {
-
-
             const formData = new FormData();
             if (videoInputRef.current?.files?.[0]) {
                 formData.append("video", videoInputRef.current.files[0]);
             }
 
-            // The critical fix - make sure data is formatted correctly for the backend
-            formData.append("data", JSON.stringify({
-                hero: {
-                    title: title.trim(),
-                    subtitle: subtitle.trim()
+            // Append image files
+            selectedImageFiles.forEach((file) => {
+                if (file) {
+                    formData.append("images", file);
                 }
-            }));
+            });
 
-            const response = await fetch("/api/sitesetting/setting", {
-                method: "POST",
+            // Prepare hero data, preserving existing images
+            const allImages = [...(hero?.images || [])];
+            selectedImageFiles.forEach((file, index) => {
+                if (file) {
+                    allImages[index] = "new_image"; // Placeholder for new uploads
+                }
+            });
+
+            const heroData = {
+                title: title.trim(),
+                subtitle: subtitle.trim(),
+                videoUrl: previewVideo || hero?.videoUrl || "",
+                images: allImages.filter((img) => img), // Remove empty entries
+            };
+
+            formData.append(
+                "data",
+                JSON.stringify({
+                    hero: heroData
+                })
+            );
+
+            const response = await fetch("/api/sitesetting/setting/hero", {
+                method: "PATCH",
                 headers: {
                     Authorization: `Bearer ${admin.token}`,
                 },
@@ -211,102 +266,32 @@ export default function HeroPage() {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                console.error("API Error Response:", {
-                    status: response.status,
-                    statusText: response.statusText,
-                    errorData,
-                });
                 throw new Error(errorData.message || errorData.details || `Error: ${response.status}`);
             }
 
             const result = await response.json();
-
-            if (result.error === true) {
+            if (result.error) {
                 throw new Error(result.message || result.details || "Failed to save hero settings");
             }
 
-            // Success path - verify that we got back the data we expected
-            if (result.data) {
-                // Extract hero data safely with better debugging
-                const heroData = result.data.hero || {};
-
-                // If hero data is missing or empty but we know we sent it, fetch fresh data
-                if (!heroData || Object.keys(heroData).length === 0) {
-                    console.warn("Hero data missing in response. Fetching fresh data...");
-                    // Fetch fresh data from API
-                    try {
-                        const refreshResponse = await fetch("/api/sitesetting/setting", {
-                            method: "GET",
-                            headers: {
-                                "Content-Type": "application/json",
-                                Authorization: `Bearer ${admin.token}`,
-                            },
-                            cache: "no-store",
-                        });
-
-                        if (refreshResponse.ok) {
-                            const refreshData = await refreshResponse.json();
-
-                            if (!refreshData.error && refreshData.data?.hero) {
-                                // Use the freshly fetched data
-                                const freshHeroData = refreshData.data.hero;
-                                setHero({
-                                    videoUrl: freshHeroData.videoUrl || "",
-                                    title: freshHeroData.title || "",
-                                    subtitle: freshHeroData.subtitle || "",
-                                });
-                                setTitle(freshHeroData.title || "");
-                                setSubtitle(freshHeroData.subtitle || "");
-                            }
-                        }
-                    } catch (refreshError) {
-                        console.error("Error refreshing data:", refreshError);
-                    }
-                } else {
-                    // Update state with data from response, falling back to current values if missing
-                    setHero({
-                        videoUrl: heroData.videoUrl || hero?.videoUrl || "",
-                        title: heroData.title || "",
-                        subtitle: heroData.subtitle || "",
-                    });
-
-                    setTitle(heroData.title || "");
-                    setSubtitle(heroData.subtitle || "");
-                }
-
-                clearPreview();
-                toast.success(result.message || "Hero settings saved", {
-                    description: "Hero settings have been saved successfully.",
+            if (result.data?.hero) {
+                setHero({
+                    videoUrl: result.data.hero.videoUrl || "",
+                    title: result.data.hero.title || "",
+                    subtitle: result.data.hero.subtitle || "",
+                    images: result.data.hero.images || [],
                 });
-            } else {
-                console.warn("Success response missing data:", result);
-                toast.success("Settings saved", {
-                    description: "Your changes have been applied successfully.",
-                });
-
-                // Refresh data to ensure we have the latest from the database
-                location.reload();
+                setTitle(result.data.hero.title || "");
+                setSubtitle(result.data.hero.subtitle || "");
+                setPreviewImages([...(result.data.hero.images || []), ...Array(4 - (result.data.hero.images?.length || 0)).fill("")]);
+                setSelectedImageFiles(Array(4).fill(null));
+                clearVideoPreview();
+                toast.success("Hero settings saved successfully");
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
-            console.error("Error uploading hero settings:", {
-                message: errorMessage,
-                errorObject: error,
-                stack: error instanceof Error ? error.stack : "No stack trace available",
-                formData: {
-                    hasVideo: !!videoInputRef.current?.files?.[0],
-                    videoType: videoInputRef.current?.files?.[0]?.type,
-                    videoSize: videoInputRef.current?.files?.[0]?.size,
-                    title,
-                    subtitle,
-                },
-            });
-
+            console.error("Error uploading hero settings:", error);
             toast.error("Update failed", {
-                description: errorMessage.toLowerCase().includes("video")
-                    ? "There was an issue with the video file. Please ensure it's a valid MP4, WebM, or OGG file under 25MB."
-                    : errorMessage,
+                description: error instanceof Error ? error.message : String(error),
             });
         } finally {
             setIsUploading(false);
@@ -321,8 +306,8 @@ export default function HeroPage() {
         );
     }
 
-    const headingText = hero?.videoUrl || hero?.title || hero?.subtitle ? "Update Hero Section" : "Add Hero Section";
-    const buttonText = hero?.videoUrl || hero?.title || hero?.subtitle ? "Update Hero" : "Add Hero";
+    const headingText = hero?.videoUrl || hero?.title || hero?.subtitle || hero?.images?.length ? "Update Hero Section" : "Add Hero Section";
+    const buttonText = hero?.videoUrl || hero?.title || hero?.subtitle || hero?.images?.length ? "Update Hero" : "Add Hero";
 
     return (
         <div className="p-8">
@@ -340,9 +325,9 @@ export default function HeroPage() {
                                 <Loader2 className="h-6 w-6 text-purple-400 animate-spin" />
                             ) : (
                                 <>
-                                    {hero?.videoUrl ? (
+                                    {(hero?.videoUrl || previewVideo) ? (
                                         <video
-                                            src={hero.videoUrl}
+                                            src={previewVideo || hero?.videoUrl}
                                             controls
                                             className="max-h-32 object-contain rounded-md"
                                             style={{ maxWidth: "100%" }}
@@ -351,8 +336,8 @@ export default function HeroPage() {
                                         <p className="text-white/50">No video set</p>
                                     )}
                                     <div className="mt-4 text-center">
-                                        <p className="text-white font-medium">{hero?.title || "No title set"}</p>
-                                        <p className="text-white/70 text-sm">{hero?.subtitle || "No subtitle set"}</p>
+                                        <p className="text-white font-medium">{title || hero?.title || "No title set"}</p>
+                                        <p className="text-white/70 text-sm">{subtitle || hero?.subtitle || "No subtitle set"}</p>
                                     </div>
                                 </>
                             )}
@@ -375,7 +360,7 @@ export default function HeroPage() {
                                         <Button
                                             variant="ghost"
                                             size="icon"
-                                            onClick={clearPreview}
+                                            onClick={clearVideoPreview}
                                             className="text-white/70 hover:text-red-400 hover:bg-white/10"
                                         >
                                             <X className="h-5 w-5" />
@@ -384,7 +369,6 @@ export default function HeroPage() {
                                 </div>
                                 <p className="text-xs text-white/50 mt-2">
                                     Accepted formats: MP4, WebM, OGG. Maximum size: 25MB.
-                                    Ensure the file extension matches the actual file format.
                                 </p>
                             </div>
 
@@ -401,6 +385,48 @@ export default function HeroPage() {
                                     </div>
                                 </div>
                             )}
+
+                            <div className="mb-6">
+                                <h2 className="text-md font-medium text-white/70 mb-2">Upload Hero Images (Max 4)</h2>
+                                <div className="grid grid-cols-2 gap-4">
+                                    {[0, 1, 2, 3].map((index) => (
+                                        <div key={index} className="relative">
+                                            <div className="flex items-center gap-4">
+                                                <Input
+                                                    type="file"
+                                                    accept="image/jpeg,image/png"
+                                                    onChange={(e) => handleImageChange(index, e)}
+                                                    className="bg-slate-800 border-white/10 text-white text-md file:text-purple-400 file:mr-4 file:py-1 file:px-4 file:rounded-md file:border-0 file:text-md file:bg-purple-500/20 file:hover:bg-purple-500/30"
+                                                />
+                                                {previewImages[index] && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => clearImagePreview(index)}
+                                                        className="text-white/70 hover:text-red-400 hover:bg-white/10"
+                                                    >
+                                                        <X className="h-5 w-5" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            {previewImages[index] && (
+                                                <div className="mt-2">
+                                                    <NextImage
+                                                        src={previewImages[index]}
+                                                        alt={`Preview image ${index + 1}`}
+                                                        width={150}
+                                                        height={100}
+                                                        className="object-cover rounded-md"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-white/50 mt-2">
+                                    Accepted formats: JPEG, PNG. Maximum size: 5MB per image.
+                                </p>
+                            </div>
 
                             <div className="mb-6">
                                 <h2 className="text-md font-medium text-white/70 mb-2">Hero Title</h2>
@@ -425,7 +451,7 @@ export default function HeroPage() {
                             <div className="flex justify-end">
                                 <Button
                                     onClick={handleSave}
-                                    disabled={isUploading || (!previewVideo && title.trim() === "" && subtitle.trim() === "")}
+                                    disabled={isUploading}
                                     className="bg-purple-500 hover:bg-purple-600 text-white flex items-center gap-2 disabled:opacity-50"
                                 >
                                     {isUploading ? (

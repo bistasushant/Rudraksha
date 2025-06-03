@@ -53,22 +53,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import parse from "html-react-parser";
-
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
+import { useDebounce } from "@/hooks/useDebounce";
 
 const ProductsPage = () => {
   const [productSearchTerm, setProductSearchTerm] = useState<string>("");
@@ -103,7 +88,7 @@ const ProductsPage = () => {
       return;
     }
     try {
-      const response = await fetch("/api/sitesetting/setting", {
+      const response = await fetch("/api/sitesetting/setting/currency", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",

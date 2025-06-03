@@ -1,13 +1,14 @@
 import { hasAuth } from "@/lib/hasAuth";
 import { connectDB } from "@/lib/mongodb";
 import { sanitizeInput, validateUpdateTestimonialRequest } from "@/lib/validation";
-import { Blog } from "@/models/Blog";
 import { Testimonial } from "@/models/Testimonial";
 import { ApiResponse, ITestimonial } from "@/types";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 interface LeanTestimonial {
   _id: string;
+  id: string;
   fullName: string;
   slug: string;
   address: string;
@@ -189,68 +190,94 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   await connectDB();
-  const { user, response } = await hasAuth(req);
-  if (!user || response) {
-    return (
-      response ||
-      NextResponse.json(
-        { error: true, message: "Unauthorized" } as ApiResponse,
-        { status: 401 }
-      )
-    );
-  }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const skip = (page - 1) * limit;
+    const { slug } = await params;
 
-    const total = await Blog.countDocuments();
-    const testimonials = await Blog.find({})
-      .lean<LeanTestimonial[]>()
-      .skip(skip)
-      .limit(limit);
-    const sanitizedTestimonial = testimonials.map((testimonial) => ({
-      id: testimonial._id.toString(),
-      fullName: testimonial.fullName,
-      slug: testimonial.slug,
-      address: testimonial.address,
-      rating: testimonial.rating,
-      description: testimonial.description,
-      seoTitle: testimonial.seoTitle || "",
-      metaDescription: testimonial.metaDescription || "",
-      metaKeywords: testimonial.metaKeywords || "",
-      image: testimonial.image,
-      createdAt: testimonial.createdAt,
-      updatedAt: testimonial.updatedAt,
-    }));
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Testimonial slug is required",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
 
-    const responseData: ApiResponse<{
-      testimonials: ITestimonial[];
-      total: number;
-      page: number;
-      totalPages: number;
-    }> = {
+    if (typeof slug !== "string") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Testimonial slug must be a string",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (slug.length > 100) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog slug too long (max 100 characters)",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    const foundTestimonials = await Testimonial.findOne({ slug })
+      .select("fullName slug address rating description seoTitle metaDescription metaKeywords image createdAt updatedAt")
+      .lean<LeanTestimonial | null>()
+
+    if (!foundTestimonials) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Testimonial not found",
+        } as ApiResponse,
+        { status: 404 }
+      );
+    }
+    const responseData: ApiResponse<ITestimonial> = {
       error: false,
       message: "Testimonial retrieved successfully",
-      data: {
-        testimonials: sanitizedTestimonial,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: foundTestimonials,
     };
-    return NextResponse.json(responseData, { status: 200 });
+
+    return NextResponse.json(responseData, {
+      status: 200,
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
+      },
+    });
   } catch (error) {
     console.error("Get Testimonial Error:", error);
+    if (error instanceof mongoose.Error.CastError) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Invalid testimonial format",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    if (error instanceof mongoose.Error) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Database error occurred",
+        } as ApiResponse,
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: true,
         message: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
       } as ApiResponse,
       { status: 500 }
     );

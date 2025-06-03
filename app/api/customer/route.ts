@@ -18,7 +18,6 @@ interface GetUsersResponseData {
     page: number;
     totalPages: number;
   };
-  newCustomersCount: number;
 }
 
 export async function GET(req: NextRequest) {
@@ -48,10 +47,6 @@ export async function GET(req: NextRequest) {
     );
     const skip = (page - 1) * limit;
 
-    // Date for filtering new customers (last 7 days)
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
     // Fetch paginated customers
     const users = await User.find({ role: "customer" })
       .select("email name contactNumber image createdAt")
@@ -79,12 +74,6 @@ export async function GET(req: NextRequest) {
     // Total customers count
     const total = await User.countDocuments({ role: "customer" });
 
-    // New customers in the past week
-    const newCustomersCount = await User.countDocuments({
-      role: "customer",
-      createdAt: { $gte: oneWeekAgo },
-    });
-
     // Response object
     const responseData: ApiResponse<GetUsersResponseData> = {
       error: false,
@@ -96,7 +85,6 @@ export async function GET(req: NextRequest) {
           page,
           totalPages: Math.ceil(total / limit),
         },
-        newCustomersCount,
       },
     };
 

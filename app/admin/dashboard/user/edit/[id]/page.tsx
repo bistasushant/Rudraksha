@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
-import { AdminRole, ApiResponse } from "@/types";
+import { AdminRole } from "@/types";
 
 interface UserProfile {
   id: string;
@@ -134,35 +134,35 @@ const EditUserPage = () => {
           }
         );
 
+        const data = await response.json();
+        console.log("API Response:", data);
+
         if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || "Failed to fetch user data");
+          throw new Error(data.message || "Failed to fetch user data");
         }
 
-        const data: ApiResponse<UserProfile[]> = await response.json();
-        const user = data.data?.find((u) => u.email === userEmail);
-
-        if (!user) {
-          throw new Error("User not found");
+        if (!data.data?.users || !Array.isArray(data.data.users) || data.data.users.length === 0) {
+          throw new Error("No user data received");
         }
 
+        const user = data.data.users[0];
         setUserData({
-          id: user.id,
-          email: user.email,
-          name: user.name,
+          id: user.id || user._id,
+          email: user.email || "",
+          name: user.name || "",
           contactNumber: user.contactNumber || "",
-          role: user.role,
+          role: user.role || "user",
         });
 
         // Validate initial form data
         setFormErrors({
-          name: validateField("name", user.name),
-          email: validateField("email", user.email),
+          name: validateField("name", user.name || ""),
+          email: validateField("email", user.email || ""),
           contactNumber: validateField("contactNumber", {
-            value: user.contactNumber,
-            role: user.role,
+            value: user.contactNumber || "",
+            role: user.role || "user",
           }),
-          role: validateField("role", user.role),
+          role: validateField("role", user.role || "user"),
           general: "",
         });
       } catch (error) {
@@ -176,7 +176,7 @@ const EditUserPage = () => {
     };
 
     fetchUserData();
-  }, [userEmail, admin, router, validateField]);
+  }, [userEmail, admin, router, validateField, params.id]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -246,7 +246,7 @@ const EditUserPage = () => {
         role: userData.role,
       };
 
-      const response = await fetch(`/api/users/${userData.id}`, {
+      const response = await fetch(`/api/users/profiles/${userData.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -255,7 +255,8 @@ const EditUserPage = () => {
         body: JSON.stringify(updateData),
       });
 
-      const data: ApiResponse = await response.json();
+      const data = await response.json();
+      console.log("Update Response:", data);
 
       if (!response.ok) {
         if (response.status === 400 && data.message?.includes("customer")) {
@@ -277,6 +278,7 @@ const EditUserPage = () => {
       toast.success("User updated successfully");
       router.push("/admin/dashboard/user");
     } catch (error) {
+      console.error("Update error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to update user";
       setFormErrors((prev) => ({ ...prev, general: errorMessage }));
@@ -285,17 +287,6 @@ const EditUserPage = () => {
       setIsSubmitting(false);
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 to-indigo-950 flex items-center justify-center">
-        <div className="space-y-4 w-full max-w-md">
-          <div className="h-8 bg-white/10 rounded animate-pulse" />
-          <div className="h-64 bg-white/10 rounded animate-pulse" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 md:p-6 lg:p-8">
@@ -311,129 +302,131 @@ const EditUserPage = () => {
           Back
         </Button>
       </div>
-      <h1 className="text-2xl font-bold text-white mb-4">Edit User</h1>
-      <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-3xl mx-auto">
-        <CardHeader>
-          <h2 className="text-lg font-bold text-white">User Details</h2>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 gap-6">
-              <div className="space-y-2">
-                <Label className="text-white/80">User Role *</Label>
-                <Select
-                  value={userData.role}
-                  onValueChange={handleRoleChange}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger
-                    className={`bg-white/5 text-white ${
-                      formErrors.role ? "border-red-500" : "border-white/20"
-                    } focus:ring-2 focus:ring-purple-500`}
+      <h1 className="text-2xl font-bold text-white mb-4">Edit User: {userData.name || "Loading..."}</h1>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      ) : (
+        <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-3xl mx-auto">
+          <CardHeader>
+            <h2 className="text-lg font-bold text-white">User Details</h2>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-white/80">User Role *</Label>
+                  <Select
+                    value={userData.role}
+                    onValueChange={handleRoleChange}
+                    disabled={isSubmitting}
                   >
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/20 text-white">
-                    {roles.map((role) => (
-                      <SelectItem key={role} value={role}>
-                        {role.charAt(0).toUpperCase() + role.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formErrors.role && (
-                  <p className="text-red-400 text-sm">{formErrors.role}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white/80">User Name *</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={userData.name}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter user name"
-                  className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${
-                    formErrors.name ? "border-red-500" : "border-white/20"
-                  }`}
-                  required
-                  disabled={isSubmitting}
-                />
-                {formErrors.name && (
-                  <p className="text-red-400 text-sm">{formErrors.name}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-white/80">
-                  Email *
-                </Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={userData.email}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter email"
-                  className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${
-                    formErrors.email ? "border-red-500" : "border-white/20"
-                  }`}
-                  required
-                  disabled={isSubmitting}
-                />
-                {formErrors.email && (
-                  <p className="text-red-400 text-sm">{formErrors.email}</p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-white/80">Contact Number</Label>
-                <Input
-                  id="contactNumber"
-                  name="contactNumber"
-                  type="text"
-                  value={userData.contactNumber}
-                  onChange={handleInputChange}
-                  onBlur={handleBlur}
-                  placeholder="Enter contact number (10 digits, required for user role)"
-                  className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${
-                    formErrors.contactNumber
+                    <SelectTrigger
+                      className={`bg-white/5 text-white ${formErrors.role ? "border-red-500" : "border-white/20"
+                        } focus:ring-2 focus:ring-purple-500`}
+                    >
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-900 border-white/20 text-white">
+                      {roles.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role.charAt(0).toUpperCase() + role.slice(1)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formErrors.role && (
+                    <p className="text-red-400 text-sm">{formErrors.role}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/80">User Name *</Label>
+                  <Input
+                    id="name"
+                    name="name"
+                    value={userData.name}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    placeholder="Enter user name"
+                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${formErrors.name ? "border-red-500" : "border-white/20"
+                      }`}
+                    required
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.name && (
+                    <p className="text-red-400 text-sm">{formErrors.name}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-white/80">
+                    Email *
+                  </Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={userData.email}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    placeholder="Enter email"
+                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${formErrors.email ? "border-red-500" : "border-white/20"
+                      }`}
+                    required
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.email && (
+                    <p className="text-red-400 text-sm">{formErrors.email}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-white/80">Contact Number</Label>
+                  <Input
+                    id="contactNumber"
+                    name="contactNumber"
+                    type="text"
+                    value={userData.contactNumber}
+                    onChange={handleInputChange}
+                    onBlur={handleBlur}
+                    placeholder="Enter contact number (10 digits, required for user role)"
+                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white ${formErrors.contactNumber
                       ? "border-red-500"
                       : "border-white/20"
-                  }`}
-                  disabled={isSubmitting}
-                />
-                {formErrors.contactNumber && (
-                  <p className="text-red-400 text-sm">
-                    {formErrors.contactNumber}
-                  </p>
-                )}
+                      }`}
+                    disabled={isSubmitting}
+                  />
+                  {formErrors.contactNumber && (
+                    <p className="text-red-400 text-sm">
+                      {formErrors.contactNumber}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
-            {formErrors.general && (
-              <p className="text-red-400 text-sm">{formErrors.general}</p>
-            )}
-            <div className="flex gap-4 justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                className="bg-white/10 hover:bg-white/20 text-white"
-                onClick={() => router.back()}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Updating..." : "Update User"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              {formErrors.general && (
+                <p className="text-red-400 text-sm">{formErrors.general}</p>
+              )}
+              <div className="flex gap-4 justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => router.back()}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Updating..." : "Update User"}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

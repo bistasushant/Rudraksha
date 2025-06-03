@@ -226,20 +226,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // New: Count products added this month
-    const startOfMonth = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      1
-    );
-    const newProductsCount = await Product.countDocuments({
-      createdAt: { $gte: startOfMonth },
-    });
-
     const responseData: ApiResponse<{
       products: IProduct[];
       total: number;
-      newProductsCount: number;
       page: number;
       totalPages: number;
     }> = {
@@ -248,7 +237,6 @@ export async function GET(req: NextRequest) {
       data: {
         products: sanitizedProducts,
         total,
-        newProductsCount,
         page,
         totalPages: Math.ceil(total / limit),
       },

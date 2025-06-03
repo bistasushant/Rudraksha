@@ -100,6 +100,7 @@ export function sanitizeInput(input: string) {
       "pre",
       "img",
       "span",
+      "u",
     ],
     allowedAttributes: {
       a: ["href", "name", "target", "rel"],
@@ -123,6 +124,7 @@ export function sanitizeInput(input: string) {
         "font-style": [/^italic$/, /^normal$/],
         padding: [/^\d+(?:px|em|rem|%)$/],
         margin: [/^\d+(?:px|em|rem|%)$/],
+        "font-family": [/^['"]?[\w\s-]+['"]?$/i],
       },
     },
   });
@@ -308,6 +310,8 @@ export const validateAddCategoryRequest = (
     validateSlug(categoryData.slug) &&
     (categoryData.description === undefined ||
       typeof categoryData.description === "string") &&
+    (categoryData.benefit === undefined ||
+      typeof categoryData.benefit === "string") &&
     (categoryData.seoTitle === undefined ||
       typeof categoryData.seoTitle === "string") &&
     (categoryData.metaDescription === undefined ||
@@ -315,7 +319,9 @@ export const validateAddCategoryRequest = (
     (categoryData.metaKeywords === undefined ||
       typeof categoryData.metaKeywords === "string") &&
     (categoryData.isActive === undefined ||
-      typeof categoryData.isActive === "boolean")
+      typeof categoryData.isActive === "boolean") &&
+    typeof categoryData.image === "string" && validateImage(categoryData.image)
+
   );
 };
 
@@ -329,9 +335,11 @@ export const validateUpdateCategoryRequest = (
   const categoryData = data as Partial<UpdateCategoryRequest>;
 
   if (
+    categoryData.image === undefined &&
     categoryData.name === undefined &&
     categoryData.slug === undefined &&
     categoryData.description === undefined &&
+    categoryData.benefit === undefined &&
     categoryData.seoTitle === undefined &&
     categoryData.metaDescription == undefined &&
     categoryData.metaKeywords === undefined &&
@@ -341,6 +349,9 @@ export const validateUpdateCategoryRequest = (
   }
 
   return (
+    (categoryData.image === undefined ||
+      (typeof categoryData.image === "string" &&
+        validateImage(categoryData.image))) &&
     (categoryData.name === undefined ||
       (typeof categoryData.name === "string" &&
         validateName(categoryData.name))) &&
@@ -349,6 +360,8 @@ export const validateUpdateCategoryRequest = (
         validateSlug(categoryData.slug))) &&
     (categoryData.description === undefined ||
       typeof categoryData.description === "string") &&
+    (categoryData.benefit === undefined ||
+      typeof categoryData.benefit === "string") &&
     (categoryData.seoTitle === undefined ||
       typeof categoryData.seoTitle === "string") &&
     (categoryData.metaDescription === undefined ||
@@ -453,8 +466,9 @@ export const validateAddBlogRequest = (
       blogData.metaDescription?.trim().length > 0 &&
       typeof blogData.metaKeywords === "string" &&
       blogData.metaKeywords?.trim().length > 0 &&
-      blogData.image === undefined) ||
-    (typeof blogData.image === "string" && validateImage(blogData.image))
+      (blogData.image === undefined ||
+        (typeof blogData.image === "string" && validateImage(blogData.image)))
+    )
   );
 };
 
@@ -507,40 +521,6 @@ export const validateUpdateBlogRequest = (
     (blogData.image === undefined ||
       (typeof blogData.image === "string" && validateImage(blogData.image)))
   );
-};
-
-// Delete validation functions
-export const validateDeleteProductRequest = (
-  data: unknown,
-  role: string
-): boolean => {
-  // RBAC: Only admin can delete products
-  if (!validateRole(role, "admin")) return false;
-  if (!data || typeof data !== "object") return false;
-  const deleteData = data as Partial<{ id: string }>;
-  return typeof deleteData.id === "string" && deleteData.id.trim().length > 0;
-};
-
-export const validateDeleteCategoryRequest = (
-  data: unknown,
-  role: string
-): boolean => {
-  // RBAC: Only admin can delete categories
-  if (!validateRole(role, "admin")) return false;
-  if (!data || typeof data !== "object") return false;
-  const deleteData = data as Partial<{ id: string }>;
-  return typeof deleteData.id === "string" && deleteData.id.trim().length > 0;
-};
-
-export const validateDeleteBlogRequest = (
-  data: unknown,
-  role: string
-): boolean => {
-  // RBAC: Only admin can delete blogs
-  if (!validateRole(role, "admin")) return false;
-  if (!data || typeof data !== "object") return false;
-  const deleteData = data as Partial<{ id: string }>;
-  return typeof deleteData.id === "string" && deleteData.id.trim().length > 0;
 };
 
 export const validateSlug = (slug: string): boolean => {

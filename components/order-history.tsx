@@ -5,7 +5,9 @@ import { Eye, Package, Search, Truck, CheckCircle, MapPin, Clock, ShoppingBag } 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth-context";
 import { toast } from "sonner";
-import { debounce } from "lodash";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useRouter } from "next/navigation";
+import { Button } from "./ui/button";
 
 interface Order {
   id: string;
@@ -46,37 +48,51 @@ const StatusBadge = ({ status }: { status: string }) => {
 };
 
 // Reusable Order Card Component
-const OrderCard = ({ order }: { order: Order }) => (
-  <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-center p-4 hover:bg-amber-100/10 dark:hover:bg-gray-800 rounded-lg transition-colors">
-    <div className="font-medium text-ivoryWhite dark:text-gray-100">{order.id}</div>
-    <div className="text-[#F5F5DC]/80 dark:text-gray-400">{order.date}</div>
-    <div className="text-[#F5F5DC]/80 dark:text-gray-400">{order.items} items</div>
-    <div className="text-ivoryWhite dark:text-gray-100">{order.total}</div>
-    <div className="flex justify-end gap-2">
-      <StatusBadge status={order.status} />
-      <button
-        aria-label={`View order ${order.id}`}
-        className="flex items-center px-3 py-1 bg-ivoryWhite dark:bg-gray-800 border border-[#D4AF37] dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 dark:hover:bg-indigo-900 transition-colors"
-      >
-        <Eye className="h-4 w-4 mr-1" />
-        View
-      </button>
+const OrderCard = ({ order, index }: { order: Order; index: number }) => {
+  const router = useRouter();
+
+  const handleViewOrder = (order: Order) => {
+    if (!order.id) {
+      toast.error("Invalid order ID");
+      return;
+    }
+  
+    router.push(`/dashboard/order-history/${order.id}`);
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 items-center p-4 hover:bg-amber-100/10 dark:hover:bg-gray-800 rounded-lg transition-colors">
+      <div className="font-medium text-ivoryWhite dark:text-gray-100 flex items-center gap-2">
+        <span className="flex items-center justify-center w-8 h-8 rounded-full bg-[#D4AF37] text-white text-lg font-bold">
+          {index + 1}
+        </span>
+      </div>
+      <div className="text-[#F5F5DC]/80 dark:text-gray-400">{order.date}</div>
+      <div className="text-[#F5F5DC]/80 dark:text-gray-400">{order.items} items</div>
+      <div className="text-ivoryWhite dark:text-gray-100">{order.total}</div>
+      <div className="flex justify-end gap-2">
+        <StatusBadge status={order.status} />
+        <Button
+          onClick={() => handleViewOrder(order)}
+          aria-label={`View order ${index + 1}`}
+          className="flex items-center px-3 py-1 bg-ivoryWhite dark:bg-gray-800 border border-[#D4AF37] dark:border-gray-600 rounded-lg text-gray-900 dark:text-gray-100 dark:hover:bg-indigo-900 transition-colors hover:bg-[#D4AF37] cursor-pointer"
+        >
+          <Eye className="h-4 w-4" />
+          View
+        </Button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default function OrderHistory() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 1000);
   const [statusFilter, setStatusFilter] = useState("all");
   const { isAuthenticated } = useAuth();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-  // Debounced search handler
-  const handleSearch = debounce((value: string) => {
-    setSearchQuery(value);
-  }, 300);
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -88,7 +104,7 @@ export default function OrderHistory() {
       setError(null);
       try {
         const url = new URL("/api/customer/history", window.location.origin);
-        if (searchQuery) url.searchParams.append("search", searchQuery);
+        if (debouncedSearchQuery) url.searchParams.append("search", debouncedSearchQuery);
         if (statusFilter && statusFilter !== "all") url.searchParams.append("status", statusFilter);
 
         const res = await fetch(url.toString(), {
@@ -103,6 +119,7 @@ export default function OrderHistory() {
 
         const data = await res.json();
         if (!data.error && data.data && data.data.orders) {
+          console.log('Fetched orders:', data.data.orders);
           setOrders(data.data.orders);
         } else {
           const errorMessage = data.message || "Failed to fetch orders";
@@ -110,7 +127,8 @@ export default function OrderHistory() {
           toast.error(errorMessage);
           setOrders([]);
         }
-      } catch {
+      } catch (error) {
+        console.error('Error fetching orders:', error);
         setError("Failed to fetch orders");
         toast.error("Failed to fetch orders");
         setOrders([]);
@@ -118,7 +136,7 @@ export default function OrderHistory() {
     };
 
     fetchOrders();
-  }, [isAuthenticated, token, searchQuery, statusFilter]);
+  }, [isAuthenticated, token, debouncedSearchQuery, statusFilter]);
 
   // Memoized filtered orders
   const filteredOrders = useMemo(() => ({
@@ -151,7 +169,7 @@ export default function OrderHistory() {
   ];
 
   return (
-    <div className="min-h-screen">
+    <div className="h-full">
       {/* Animated background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-4 -right-4 w-72 h-72 bg-brassGold rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
@@ -183,7 +201,8 @@ export default function OrderHistory() {
                   type="search"
                   placeholder="Search orders..."
                   className="pl-12 pr-4 py-4 w-full bg-[#2A2A2A]/80 border border-[#D4AF37] rounded-2xl focus:ring-4 focus:ring-[#D4AF37]/20 focus:border-[#D4AF37] transition-all duration-300 text-ivoryWhite placeholder-ivoryWhite shadow-lg"
-                  onChange={(e) => handleSearch(e.target.value)}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={searchQuery}
                   aria-label="Search orders"
                 />
               </div>
@@ -266,7 +285,7 @@ export default function OrderHistory() {
                           style={{ animationDelay: `${index * 100}ms` }}
                           className="animate-fade-in"
                         >
-                          <OrderCard order={order} />
+                          <OrderCard order={order} index={index} />
                         </div>
                       ))}
                     </div>
@@ -279,29 +298,29 @@ export default function OrderHistory() {
       </div>
 
       <style jsx>{`
-      @keyframes blob {
-        0% { transform: translate(0px, 0px) scale(1); }
-        33% { transform: translate(30px, -50px) scale(1.1); }
-        66% { transform: translate(-20px, 20px) scale(0.9); }
-        100% { transform: translate(0px, 0px) scale(1); }
-      }
-      .animate-blob {
-        animation: blob 7s infinite;
-      }
-      .animation-delay-2000 {
-        animation-delay: 2s;
-      }
-      .animation-delay-4000 {
-        animation-delay: 4s;
-      }
-      @keyframes fade-in {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      .animate-fade-in {
-        animation: fade-in 0.6s ease-out forwards;
-      }
-    `}</style>
+        @keyframes blob {
+          0% { transform: translate(0px, 0px) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+          100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+        @keyframes fade-in {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.6s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }

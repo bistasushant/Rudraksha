@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
 import { validateName, validateSlug } from "@/lib/validation";
 import { ICategory, ISubCategory } from "@/types";
-import { Types } from "mongoose";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const generateSlug = (name: string): string => {
   return name
@@ -20,22 +20,6 @@ const generateSlug = (name: string): string => {
     .replace(/[^a-z0-9 -]/g, "")
     .replace(/\s+/g, "-")
     .trim();
-};
-
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
 };
 
 interface FormValues {
@@ -127,7 +111,7 @@ const EditSubCategoryForm: React.FC = () => {
       try {
         setLoading(true);
 
-        // Fetch subcategory
+        // Fetch subcategory using slug
         const subCategoryResponse = await fetch(`/api/subcategory/${routeId}`, {
           method: "GET",
           headers: {
@@ -156,59 +140,48 @@ const EditSubCategoryForm: React.FC = () => {
           }
           throw new Error(errorMessage);
         }
-        const contentType = subCategoryResponse.headers.get("content-type");
-        if (!contentType || !contentType.includes("application/json")) {
-          const text = await subCategoryResponse.text();
-          console.error("Subcategory non-JSON response:", text);
-          throw new Error("Subcategory response is not JSON");
-        }
 
         const subCategoryResult = await subCategoryResponse.json();
+        console.log(subCategoryResult)
 
-        // Correctly extract subCategoryData from data.categories
-        const subCategoryData = subCategoryResult.data?.categories?.find(
-          (s: ISubCategory) => s.slug === routeId || s.id === routeId
-        );
+        // Get subcategory data from the response
+        const subCategoryData = subCategoryResult.data;
 
         if (!subCategoryData) {
           throw new Error("Subcategory not found in response data");
         }
 
-        setSubCategory(subCategoryData);
-        setOriginalSlug(subCategoryData.slug || "");
+        // Convert _id to id for consistency
+        const formattedData = {
+          ...subCategoryData,
+          id: subCategoryData._id,
+        };
+
+        setSubCategory(formattedData);
+        setOriginalSlug(formattedData.slug || "");
 
         // Update form values
         const newFormValues = {
-          subCategoryName: subCategoryData.name || "",
-          seoTitle: subCategoryData.seoTitle || "",
-          metaDescription: subCategoryData.metaDescription || "",
-          metaKeywords: subCategoryData.metaKeywords || "",
-          isActive: subCategoryData.isActive ?? true,
-          slug: subCategoryData.slug || "",
+          subCategoryName: formattedData.name || "",
+          seoTitle: formattedData.seoTitle || "",
+          metaDescription: formattedData.metaDescription || "",
+          metaKeywords: formattedData.metaKeywords || "",
+          isActive: formattedData.isActive ?? true,
+          slug: formattedData.slug || "",
         };
         setFormValues(newFormValues);
 
         // Set categories
-        const categoryIds = Array.isArray(subCategoryData.category)
-          ? subCategoryData.category.map(
-              (
-                cat:
-                  | string
-                  | Types.ObjectId
-                  | { _id?: Types.ObjectId; id?: string }
-              ) => {
-                if (typeof cat === "string") return cat;
-                if (typeof cat === "object" && cat !== null) {
-                  return (
-                    cat._id?.toString() || cat.id?.toString() || String(cat)
-                  );
-                }
-                return String(cat);
-              }
-            )
-          : subCategoryData.category
-          ? [subCategoryData.category.toString()]
-          : [];
+        const categoryIds = Array.isArray(formattedData.category)
+          ? formattedData.category.map((cat: { _id?: string; id?: string } | string) => {
+            if (typeof cat === 'object' && cat !== null) {
+              return cat._id?.toString() || cat.id?.toString();
+            }
+            return cat.toString();
+          })
+          : formattedData.category
+            ? [formattedData.category.toString()]
+            : [];
         setSelectedCategories(categoryIds);
 
         // Fetch categories
@@ -228,19 +201,8 @@ const EditSubCategoryForm: React.FC = () => {
           );
         }
 
-        // Check if response is JSON
-        const categoriesContentType =
-          categoriesResponse.headers.get("content-type");
-        if (
-          !categoriesContentType ||
-          !categoriesContentType.includes("application/json")
-        ) {
-          const text = await categoriesResponse.text();
-          console.error("Categories non-JSON response:", text);
-          throw new Error("Categories response is not JSON");
-        }
-
         const categoriesResult = await categoriesResponse.json();
+        console.log("Categories Response:", categoriesResult);
         const categoriesData = categoriesResult.data?.categories || [];
         if (!Array.isArray(categoriesData)) {
           throw new Error("Categories data is not an array");
@@ -548,11 +510,10 @@ const EditSubCategoryForm: React.FC = () => {
                     <Label className="text-white/80">Subcategory Name *</Label>
                     <Input
                       name="subCategoryName"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.subCategoryName
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.subCategoryName
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter subcategory name"
                       value={formValues.subCategoryName}
                       onChange={handleInputChange}
@@ -571,11 +532,10 @@ const EditSubCategoryForm: React.FC = () => {
                     <div className="relative">
                       <button
                         type="button"
-                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${
-                          formErrors.categories
-                            ? "border-red-500 border"
-                            : "border-white/20"
-                        }`}
+                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${formErrors.categories
+                          ? "border-red-500 border"
+                          : "border-white/20"
+                          }`}
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         disabled={isSubmitting}
                         aria-expanded={isDropdownOpen}
@@ -613,9 +573,8 @@ const EditSubCategoryForm: React.FC = () => {
                           )}
                         </div>
                         <ChevronDown
-                          className={`h-5 w-5 text-white/50 transition-transform ${
-                            isDropdownOpen ? "rotate-180" : ""
-                          }`}
+                          className={`h-5 w-5 text-white/50 transition-transform ${isDropdownOpen ? "rotate-180" : ""
+                            }`}
                         />
                       </button>
                       {isDropdownOpen && (
@@ -641,11 +600,10 @@ const EditSubCategoryForm: React.FC = () => {
                             filteredCategories.map((category) => (
                               <div
                                 key={category.id}
-                                className={`px-4 py-2 cursor-pointer hover:bg-white/10 text-white hover:text-white flex items-center justify-between ${
-                                  selectedCategories.includes(category.id)
-                                    ? "bg-purple-600/70"
-                                    : ""
-                                }`}
+                                className={`px-4 py-2 cursor-pointer hover:bg-white/10 text-white hover:text-white flex items-center justify-between ${selectedCategories.includes(category.id)
+                                  ? "bg-purple-600/70"
+                                  : ""
+                                  }`}
                                 onClick={() =>
                                   handleCategoryToggle(category.id)
                                 }
@@ -701,11 +659,10 @@ const EditSubCategoryForm: React.FC = () => {
                     <Label className="text-white/80">SEO Title</Label>
                     <Input
                       name="seoTitle"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.seoTitle
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter SEO title (max 60 characters)"
                       value={formValues.seoTitle}
                       onChange={handleInputChange}
@@ -726,11 +683,10 @@ const EditSubCategoryForm: React.FC = () => {
                     <Label className="text-white/80">Meta Description</Label>
                     <Textarea
                       name="metaDescription"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${
-                        formErrors.metaDescription
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta description (max 160 characters)"
                       value={formValues.metaDescription}
                       onChange={handleInputChange}
@@ -751,11 +707,10 @@ const EditSubCategoryForm: React.FC = () => {
                     <Label className="text-white/80">Meta Keywords</Label>
                     <Input
                       name="metaKeywords"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.metaKeywords
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta keywords (comma-separated, max 10)"
                       value={formValues.metaKeywords}
                       onChange={handleInputChange}
@@ -774,19 +729,19 @@ const EditSubCategoryForm: React.FC = () => {
               {Object.values(formErrors).some(
                 (error) => error && error !== formErrors.general
               ) && (
-                <div className="text-red-500 text-sm mb-4">
-                  <p>Please fix the following errors:</p>
-                  <ul>
-                    {Object.entries(formErrors).map(([field, error]) =>
-                      error && field !== "general" ? (
-                        <li key={field}>
-                          {field}: {error}
-                        </li>
-                      ) : null
-                    )}
-                  </ul>
-                </div>
-              )}
+                  <div className="text-red-500 text-sm mb-4">
+                    <p>Please fix the following errors:</p>
+                    <ul>
+                      {Object.entries(formErrors).map(([field, error]) =>
+                        error && field !== "general" ? (
+                          <li key={field}>
+                            {field}: {error}
+                          </li>
+                        ) : null
+                      )}
+                    </ul>
+                  </div>
+                )}
 
               <div className="flex gap-4 justify-end">
                 <Button

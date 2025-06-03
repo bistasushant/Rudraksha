@@ -45,22 +45,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Types } from "mongoose";
 import parse from "html-react-parser";
-
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
+import { useDebounce } from "@/hooks/useDebounce";
 
 const BlogPage = () => {
   const [blogSearchTerm, setBlogSearchTerm] = useState<string>("");
@@ -180,9 +165,8 @@ const BlogPage = () => {
     return categoryIds
       .map((categoryId) => {
         const id = categoryId.toString();
-        // This is likely where the issue is - we need to check how the ID is stored in your category objects
         const category = categories.find(
-          (cat) => cat.id === id || cat.id === id || cat.id?.toString() === id
+          (cat) => cat.id?.toString() === id
         );
         return category ? category.name : "Unknown Blog Category";
       })

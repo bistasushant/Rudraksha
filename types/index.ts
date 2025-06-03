@@ -136,9 +136,11 @@ export interface UpdateProductRequest {
 
 export interface ICategory {
   id: string;
+  image: string;
   name: string;
   slug: string;
   description?: string;
+  benefit?: string
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -149,8 +151,10 @@ export interface ICategory {
 
 export interface AddCategoryRequest {
   name: string;
+  image: string;
   slug: string;
   description?: string;
+  benefit?: string;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -158,9 +162,11 @@ export interface AddCategoryRequest {
 }
 
 export interface UpdateCategoryRequest {
+  image?: string;
   name?: string;
   slug?: string;
   description?: string;
+  benefit?: string;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -283,6 +289,7 @@ export interface IHero {
   title: string;
   subtitle: string;
   videoUrl: string;
+  images?: string[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -316,7 +323,7 @@ export interface UpdateSettingsRequest {
   logo?: { url: string };
   currency?: { currency: string };
   title?: { title: string };
-  hero?: { title: string; subtitle: string; videoUrl: string };
+  hero?: { title: string; subtitle: string; videoUrl: string; images?: string[] };
 
 }
 
@@ -597,6 +604,7 @@ export interface IWishlistItem extends Document {
   productImage: string;
   createdAt?: Date;
 }
+
 
 
 

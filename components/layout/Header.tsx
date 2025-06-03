@@ -45,7 +45,6 @@ export default function Header() {
 
 
   const [mounted, setMounted] = useState(false);
-  // const [isScrolled, setIsScrolled] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [miniCartOpen, setMiniCartOpen] = useState(false);
@@ -55,7 +54,6 @@ export default function Header() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
-  // const lastScrollY = useRef(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const miniCartRef = useRef<HTMLDivElement>(null);
@@ -148,17 +146,6 @@ export default function Header() {
 
     fetchSettings();
   }, []);
-
-  // useEffect(() => {
-  //   const handleScroll = () => {
-  //     const currentScrollY = window.scrollY;
-  //     setIsScrolled(currentScrollY > 50);
-  //     lastScrollY.current = currentScrollY;
-  //   };
-
-  //   window.addEventListener("scroll", handleScroll, { passive: true });
-  //   return () => window.removeEventListener("scroll", handleScroll);
-  // }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -302,7 +289,7 @@ export default function Header() {
                 {messages.map((message, index) => (
                   <motion.div
                     key={index}
-                    className="absolute w-full flex justify-center items-center h-full font-semibold text-sm text-charcoalBlack whitespace-nowrap mt-1"
+                    className="absolute md:w-[90%] w-full flex justify-center items-center h-full font-semibold text-sm text-charcoalBlack whitespace-nowrap mt-1"
                     initial={{ y: index === 0 ? 0 : 30 }}
                     animate={{
                       y: index === currentMessageIndex ? 0 : index === (currentMessageIndex - 1 + messages.length) % messages.length ? -30 : 30,

@@ -4,9 +4,11 @@ import { model, models, Schema, Types } from "mongoose";
 // Interface for MongoDB document (before mapping)
 interface ICategoryDocument {
   _id: Types.ObjectId;
+  image: string;
   name: string;
   slug: string;
   description?: string;
+  benefit?: string;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -17,6 +19,10 @@ interface ICategoryDocument {
 
 const categorySchema = new Schema<ICategoryDocument>(
   {
+    image: {
+      type: String,
+      required: true,
+    },
     name: {
       type: String,
       required: true,
@@ -30,6 +36,11 @@ const categorySchema = new Schema<ICategoryDocument>(
       trim: true,
     },
     description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    benefit: {
       type: String,
       trim: true,
       default: "",
@@ -66,9 +77,11 @@ export const Category =
 export function formatCategory(category: ICategoryDocument): ICategory {
   return {
     id: category._id.toString(),
+    image: category.image,
     name: category.name,
     slug: category.slug,
     description: category.description || "",
+    benefit: category.benefit || "",
     seoTitle: category.seoTitle || "",
     metaDescription: category.metaDescription || "",
     metaKeywords: category.metaKeywords || "",

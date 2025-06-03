@@ -45,23 +45,9 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import parse from "html-react-parser";
 import { renderStars } from "@/components/admin/RenderStars";
+import { useDebounce } from "@/hooks/useDebounce";
 
 
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 const TestimonialPage = () => {
   const [testimonialData, setTestimonialData] = useState<ITestimonial[]>([]);
   const [currentPage, setCurrentPage] = useState(1);

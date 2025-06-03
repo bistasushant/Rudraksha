@@ -22,66 +22,95 @@ interface LeanSubCategory {
   createdAt: Date;
   updatedAt: Date;
 }
-export async function GET(req: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   await connectDB();
+
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const skip = (page - 1) * limit;
+    const { slug } = await params;
 
-    const total = await subCategory.countDocuments();
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Subcategory slug is required",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    if (typeof slug != "string") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Subcategory slug must be a string",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    if (slug.length > 100) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Subcategory slug too long (max 100 characters)",
+        } as ApiResponse,
+        { status: 400 }
+      )
+    }
     const subCategories = await subCategory
-      .find({})
-      .populate({
-        path: "category",
-        select: "_id name slug isActive",
-        model: Category,
-      })
-      .skip(skip)
-      .limit(limit)
-      .lean<LeanSubCategory[]>();
+      .findOne({ slug })
+      .select("name slug category seoTitle metaDescription metaKeywords isActive createdAt updatedAt")
+      .lean<LeanSubCategory | null>();
 
-    const sanitizedSubCategories: ISubCategory[] = subCategories.map(
-      (subCategory) => ({
-        id: subCategory._id.toString(),
-        name: subCategory.name,
-        slug: subCategory.slug,
-        category: subCategory.category.map((cat) => cat._id.toString()), // Map to IDs only
-        seoTitle: subCategory.seoTitle || "",
-        metaDescription: subCategory.metaDescription || "",
-        metaKeywords: subCategory.metaKeywords || "",
-        isActive: subCategory.isActive,
-        createdAt: subCategory.createdAt,
-        updatedAt: subCategory.updatedAt,
-      })
-    );
-
-    const responseData: ApiResponse<{
-      categories: ISubCategory[];
-      total: number;
-      page: number;
-      totalPages: number;
-    }> = {
+    if (!subCategories) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Subcategory not found",
+        } as ApiResponse,
+        { status: 404 }
+      );
+    }
+    const responseData: ApiResponse<LeanSubCategory> = {
       error: false,
       message: "Subcategory retrieved successfully",
-      data: {
-        categories: sanitizedSubCategories,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: subCategories,
     };
+
     return NextResponse.json(responseData, {
       status: 200,
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
+      },
     });
   } catch (error) {
-    console.error("Get Subcategories Error:", error);
+    console.error("Get SubCategory Error:", error);
+
+    if (error instanceof mongoose.Error.CastError) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Invalid subcategory format",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof mongoose.Error) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Database error occurred",
+        } as ApiResponse,
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: true,
         message: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
       } as ApiResponse,
       { status: 500 }
     );

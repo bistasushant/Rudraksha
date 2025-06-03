@@ -344,7 +344,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${
+              className={`h-8 w-8 hover:bg-gray-600/20 ${
                 editor?.isActive("bold") ? "bg-white/20" : ""
               }`}
               onClick={() => editor?.chain().focus().toggleBold().run()}
@@ -357,7 +357,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${
+              className={`h-8 w-8 hover:bg-gray-600/20 ${
                 editor?.isActive("italic") ? "bg-white/20" : ""
               }`}
               onClick={() => editor?.chain().focus().toggleItalic().run()}
@@ -370,7 +370,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${
+              className={`h-8 w-8 hover:bg-gray-600/20 ${
                 editor?.isActive("underline") ? "bg-white/20" : ""
               }`}
               onClick={() => editor?.chain().focus().toggleUnderline().run()}
@@ -383,7 +383,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${
+              className={`h-8 w-8 hover:bg-gray-600/20 ${
                 editor?.isActive("bulletList") ? "bg-white/20" : ""
               }`}
               onClick={() => editor?.chain().focus().toggleBulletList().run()}
@@ -396,7 +396,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className={`h-8 w-8 ${
+              className={`h-8 w-8 hover:bg-gray-600/20 ${
                 editor?.isActive("orderedList") ? "bg-white/20" : ""
               }`}
               onClick={() => editor?.chain().focus().toggleOrderedList().run()}
@@ -411,7 +411,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-8 w-8 hover:bg-gray-600/20"
               onClick={() => setImageDialogOpen(true)}
             >
               <ImageIcon className="h-4 w-4 text-white" />
@@ -423,7 +423,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 hover:bg-gray-600/20"
                 >
                   <Palette className="h-4 w-4 text-white" />
                 </Button>

@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/admin/RichTextEditor";
-import { ITestimonial } from "@/types";
 
 const generateSlug = (name: string): string => {
   return name
@@ -49,7 +48,7 @@ interface FormErrors {
 const EditTestimonialForm: React.FC = () => {
   const router = useRouter();
   const params = useParams();
-  const routeId = params.id as string;
+  const testimonialSlug = Array.isArray(params.id) ? params.id[0] : params.id;
   const { admin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [originalSlug, setOriginalSlug] = useState<string>("");
@@ -95,7 +94,7 @@ const EditTestimonialForm: React.FC = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/testimonial?page=1&limit=100`, {
+        const response = await fetch(`/api/testimonial/${testimonialSlug}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -110,19 +109,15 @@ const EditTestimonialForm: React.FC = () => {
         }
 
         const result = await response.json();
-        const testimonials = Array.isArray(result.data?.testimonials)
-          ? result.data.testimonials
-          : [];
-        const testimonialData = testimonials.find(
-          (p: ITestimonial) => p.id === routeId || p.slug === routeId
-        );
+        console.log(result)
+        const testimonialData = result.data;
 
         if (!testimonialData || typeof testimonialData !== "object") {
           throw new Error("Testimonial data not found or invalid in response");
         }
         setOriginalSlug(testimonialData.slug || "");
         setFormValues({
-          id: testimonialData.id || "",
+          id: testimonialData._id || "",
           fullName: testimonialData.fullName || "",
           address: testimonialData.address || "",
           rating: Number(testimonialData.rating) || 1,
@@ -160,7 +155,7 @@ const EditTestimonialForm: React.FC = () => {
     };
 
     fetchData();
-  }, [admin, routeId, router]);
+  }, [admin, testimonialSlug, router]);
 
   const validateField = (
     fieldName: string,
@@ -434,10 +429,6 @@ const EditTestimonialForm: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return <div className="text-white">Loading...</div>;
-  }
-
   if (!admin?.token || !["admin", "editor"].includes(admin.role)) {
     return null;
   }
@@ -455,219 +446,225 @@ const EditTestimonialForm: React.FC = () => {
           Back
         </Button>
       </div>
-      <h1 className="text-2xl font-bold text-white mb-4">Edit Testimonial</h1>
-      <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
-        <CardContent className="pt-6">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-6 md:border-r md:border-white/40 md:pr-6">
-                <h3 className="text-lg font-bold text-white">Testimonial Details</h3>
-                <div className="space-y-2">
-                  <Label className="text-white/80">Testimonial Image (PNG/JPG, max 2MB)</Label>
-                  <div className="relative group w-full max-w-md mx-auto">
-                    <label
-                      htmlFor="image-upload"
-                      className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${formErrors.image ? "border-red-500" : "border-white/30"
-                        }`}
-                    >
-                      {formValues.image ? (
-                        <div className="relative w-full h-full p-2">
-                          <Image
-                            src={formValues.image}
-                            alt="Testimonial image preview"
-                            fill
-                            className="object-contain rounded-lg"
-                          />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveImage();
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-red-500/80 rounded-full hover:bg-red-400 transition-colors"
-                          >
-                            <X className="h-4 w-4 text-white" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="h-12 w-12 text-white/50 mb-2 group-hover:text-purple-400" />
-                          <span className="text-white/70 group-hover:text-purple-400">
-                            Click to upload an image
-                          </span>
-                          <span className="text-sm text-white/50">PNG, JPG (max 2MB)</span>
-                        </>
+      <h1 className="text-2xl font-bold text-white mb-4">Edit Testimonial : {formValues.fullName || "Loading"}</h1>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      ) : (
+        <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
+          <CardContent className="pt-6">
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-6 md:border-r md:border-white/40 md:pr-6">
+                  <h3 className="text-lg font-bold text-white">Testimonial Details</h3>
+                  <div className="space-y-2">
+                    <Label className="text-white/80">Testimonial Image (PNG/JPG, max 2MB)</Label>
+                    <div className="relative group w-full max-w-md mx-auto">
+                      <label
+                        htmlFor="image-upload"
+                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${formErrors.image ? "border-red-500" : "border-white/30"
+                          }`}
+                      >
+                        {formValues.image ? (
+                          <div className="relative w-full h-full p-2">
+                            <Image
+                              src={formValues.image}
+                              alt="Testimonial image preview"
+                              fill
+                              className="object-contain rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveImage();
+                              }}
+                              className="absolute top-2 right-2 p-1 bg-red-500/80 rounded-full hover:bg-red-400 transition-colors"
+                            >
+                              <X className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="h-12 w-12 text-white/50 mb-2 group-hover:text-purple-400" />
+                            <span className="text-white/70 group-hover:text-purple-400">
+                              Click to upload an image
+                            </span>
+                            <span className="text-sm text-white/50">PNG, JPG (max 2MB)</span>
+                          </>
+                        )}
+                      </label>
+                      <input
+                        id="image-upload"
+                        name="image"
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.image && (
+                        <p className="text-red-500 text-sm mt-1">{formErrors.image}</p>
                       )}
-                    </label>
-                    <input
-                      id="image-upload"
-                      name="image"
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      className="hidden"
-                      onChange={handleImageUpload}
-                      disabled={isSubmitting}
-                    />
-                    {formErrors.image && (
-                      <p className="text-red-500 text-sm mt-1">{formErrors.image}</p>
-                    )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6">
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Full Name *</Label>
+                      <Input
+                        name="fullName"
+                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.fullName ? "border-red-500" : "border-white/20"
+                          }`}
+                        placeholder="Enter full name"
+                        required
+                        value={formValues.fullName}
+                        onChange={handleInputChange}
+                        onBlur={handleBlur}
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.fullName && (
+                        <p className="text-red-500 text-sm">{formErrors.fullName}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Address *</Label>
+                      <Input
+                        name="address"
+                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.address ? "border-red-500" : "border-white/20"
+                          }`}
+                        placeholder="Enter address"
+                        required
+                        value={formValues.address}
+                        onChange={handleInputChange}
+                        onBlur={handleBlur}
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.address && (
+                        <p className="text-red-500 text-sm">{formErrors.address}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Rating *</Label>
+                      <select
+                        name="rating"
+                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.rating ? "border-red-500" : "border-white/20"
+                          }`}
+                        value={formValues.rating}
+                        onChange={(e) => {
+                          const value = parseInt(e.target.value);
+                          setFormValues((prev) => ({ ...prev, rating: value }));
+                          const error = validateField("rating", value);
+                          setFormErrors((prev) => ({ ...prev, rating: error }));
+                        }}
+                        disabled={isSubmitting}
+                      >
+                        {[1, 2, 3, 4, 5].map((val) => (
+                          <option key={val} value={val}>
+                            {val}
+                          </option>
+                        ))}
+                      </select>
+                      {formErrors.rating && (
+                        <p className="text-red-500 text-sm">{formErrors.rating}</p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-white/80">Description *</Label>
+                      <RichTextEditor
+                        placeholder="Description..."
+                        value={formValues.description}
+                        onChange={handleRichTextChange}
+                      />
+                      {formErrors.description && (
+                        <p className="text-red-500 text-sm">{formErrors.description}</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-white">SEO Content</h3>
                   <div className="space-y-2">
-                    <Label className="text-white/80">Full Name *</Label>
+                    <Label className="text-white/80">SEO Title</Label>
                     <Input
-                      name="fullName"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.fullName ? "border-red-500" : "border-white/20"
+                      name="seoTitle"
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle ? "border-red-500" : "border-white/20"
                         }`}
-                      placeholder="Enter full name"
-                      required
-                      value={formValues.fullName}
+                      placeholder="Enter SEO title (max 60 characters)"
+                      value={formValues.seoTitle}
                       onChange={handleInputChange}
                       onBlur={handleBlur}
                       disabled={isSubmitting}
                     />
-                    {formErrors.fullName && (
-                      <p className="text-red-500 text-sm">{formErrors.fullName}</p>
+                    <p className="text-white/50 text-sm">
+                      {formValues.seoTitle.length}/60 characters
+                    </p>
+                    {formErrors.seoTitle && (
+                      <p className="text-red-500 text-sm">{formErrors.seoTitle}</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-white/80">Address *</Label>
-                    <Input
-                      name="address"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.address ? "border-red-500" : "border-white/20"
+                    <Label className="text-white/80">Meta Description</Label>
+                    <Textarea
+                      name="metaDescription"
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription ? "border-red-500" : "border-white/20"
                         }`}
-                      placeholder="Enter address"
-                      required
-                      value={formValues.address}
+                      placeholder="Enter meta description (max 160 characters)"
+                      value={formValues.metaDescription}
                       onChange={handleInputChange}
                       onBlur={handleBlur}
                       disabled={isSubmitting}
                     />
-                    {formErrors.address && (
-                      <p className="text-red-500 text-sm">{formErrors.address}</p>
+                    <p className="text-white/50 text-sm">
+                      {formValues.metaDescription.length}/160 characters
+                    </p>
+                    {formErrors.metaDescription && (
+                      <p className="text-red-500 text-sm">{formErrors.metaDescription}</p>
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-white/80">Rating *</Label>
-                    <select
-                      name="rating"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.rating ? "border-red-500" : "border-white/20"
+                    <Label className="text-white/80">Meta Keywords</Label>
+                    <Input
+                      name="metaKeywords"
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords ? "border-red-500" : "border-white/20"
                         }`}
-                      value={formValues.rating}
-                      onChange={(e) => {
-                        const value = parseInt(e.target.value);
-                        setFormValues((prev) => ({ ...prev, rating: value }));
-                        const error = validateField("rating", value);
-                        setFormErrors((prev) => ({ ...prev, rating: error }));
-                      }}
+                      placeholder="Enter meta keywords (comma-separated, max 10)"
+                      value={formValues.metaKeywords}
+                      onChange={handleInputChange}
+                      onBlur={handleBlur}
                       disabled={isSubmitting}
-                    >
-                      {[1, 2, 3, 4, 5].map((val) => (
-                        <option key={val} value={val}>
-                          {val}
-                        </option>
-                      ))}
-                    </select>
-                    {formErrors.rating && (
-                      <p className="text-red-500 text-sm">{formErrors.rating}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-white/80">Description *</Label>
-                    <RichTextEditor
-                      placeholder="Description..."
-                      value={formValues.description}
-                      onChange={handleRichTextChange}
                     />
-                    {formErrors.description && (
-                      <p className="text-red-500 text-sm">{formErrors.description}</p>
+                    {formErrors.metaKeywords && (
+                      <p className="text-red-500 text-sm">{formErrors.metaKeywords}</p>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="space-y-6">
-                <h3 className="text-lg font-bold text-white">SEO Content</h3>
-                <div className="space-y-2">
-                  <Label className="text-white/80">SEO Title</Label>
-                  <Input
-                    name="seoTitle"
-                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle ? "border-red-500" : "border-white/20"
-                      }`}
-                    placeholder="Enter SEO title (max 60 characters)"
-                    value={formValues.seoTitle}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-white/50 text-sm">
-                    {formValues.seoTitle.length}/60 characters
-                  </p>
-                  {formErrors.seoTitle && (
-                    <p className="text-red-500 text-sm">{formErrors.seoTitle}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/80">Meta Description</Label>
-                  <Textarea
-                    name="metaDescription"
-                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription ? "border-red-500" : "border-white/20"
-                      }`}
-                    placeholder="Enter meta description (max 160 characters)"
-                    value={formValues.metaDescription}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    disabled={isSubmitting}
-                  />
-                  <p className="text-white/50 text-sm">
-                    {formValues.metaDescription.length}/160 characters
-                  </p>
-                  {formErrors.metaDescription && (
-                    <p className="text-red-500 text-sm">{formErrors.metaDescription}</p>
-                  )}
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-white/80">Meta Keywords</Label>
-                  <Input
-                    name="metaKeywords"
-                    className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords ? "border-red-500" : "border-white/20"
-                      }`}
-                    placeholder="Enter meta keywords (comma-separated, max 10)"
-                    value={formValues.metaKeywords}
-                    onChange={handleInputChange}
-                    onBlur={handleBlur}
-                    disabled={isSubmitting}
-                  />
-                  {formErrors.metaKeywords && (
-                    <p className="text-red-500 text-sm">{formErrors.metaKeywords}</p>
-                  )}
-                </div>
+              {formErrors.general && (
+                <p className="text-red-500 text-sm">{formErrors.general}</p>
+              )}
+              <div className="flex gap-4 justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => router.back()}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? "Updating..." : "Update Testimonial"}
+                </Button>
               </div>
-            </div>
-            {formErrors.general && (
-              <p className="text-red-500 text-sm">{formErrors.general}</p>
-            )}
-            <div className="flex gap-4 justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                className="bg-white/10 hover:bg-white/20 text-white"
-                onClick={() => router.back()}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Updating..." : "Update Testimonial"}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

@@ -23,7 +23,7 @@ export default function TitlePage() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/title", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

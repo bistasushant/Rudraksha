@@ -9,9 +9,11 @@ import { Types } from "mongoose";
 // Interface for MongoDB document (before mapping)
 interface ICategoryDocument {
   _id: Types.ObjectId;
+  image: string;
   name: string;
   slug: string;
   description?: string;
+  benefit?: string;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -24,9 +26,11 @@ interface ICategoryDocument {
 function formatCategory(category: ICategoryDocument): ICategory {
   return {
     id: category._id.toString(),
+    image: category.image || "/placeholder.png",
     name: category.name,
     slug: category.slug,
     description: category.description || "",
+    benefit: category.benefit || "",
     seoTitle: category.seoTitle || "",
     metaDescription: category.metaDescription || "",
     metaKeywords: category.metaKeywords || "",
@@ -118,8 +122,10 @@ export async function POST(req: NextRequest) {
 
     const {
       name,
+      image,
       slug,
       description,
+      benefit,
       seoTitle,
       metaDescription,
       metaKeywords,
@@ -138,9 +144,11 @@ export async function POST(req: NextRequest) {
     // Ensure fields are explicitly defined even if empty
     const categoryData = {
       name: sanitizeInput(name),
+      image: sanitizeInput(image),
       slug: sanitizeInput(slug),
       // For description, use sanitizeInput with HTML allowed
       description: sanitizeInput(description || ""),
+      benefit: sanitizeInput(benefit || ""),
       seoTitle: sanitizeInput(seoTitle || ""),
       metaDescription: sanitizeInput(metaDescription || ""),
       metaKeywords: sanitizeInput(metaKeywords || ""),

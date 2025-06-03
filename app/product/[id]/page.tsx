@@ -10,7 +10,6 @@ import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import DOMPurify from "dompurify";
 import parse from "html-react-parser";
-import "../../../components/ProductDetailPage.css";
 
 // Interfaces (keeping existing interfaces)
 interface Product {

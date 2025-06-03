@@ -19,7 +19,7 @@ export async function GET() {
 
     // Ensure hero data is properly structured in the response
     const responseData = settings || {
-      hero: { title: "", subtitle: "", videoUrl: "" }
+      hero: { title: "", subtitle: "", videoUrl: "", images: [] },
     };
 
     return NextResponse.json(
@@ -68,7 +68,9 @@ export async function POST(req: NextRequest) {
         title: string;
         subtitle: string;
         videoUrl: string;
-        updated: Date;
+        images?: string[];
+        createdAt: Date;
+        updatedAt: Date;
       };
       logo?: { url: string; createdAt: Date };
       currency?: { currency: string; updatedAt: Date };
@@ -82,7 +84,9 @@ export async function POST(req: NextRequest) {
       title: "",
       subtitle: "",
       videoUrl: "",
-      updated: new Date()
+      images: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
 
     const logoFile = formData.get("logo") as File | null;
@@ -115,6 +119,42 @@ export async function POST(req: NextRequest) {
       const ext = videoFile.name.split(".").pop();
       const fileName = `hero-video-${timestamp}.${ext}`;
       videoUrl = await saveFileLocally(videoFile, "uploads/videos", fileName);
+    }
+
+    // Handle hero images upload
+    const imageFiles = formData.getAll("images") as File[];
+    const uploadedImageUrls: string[] = [];
+
+    if (imageFiles && imageFiles.length > 0) {
+      if (imageFiles.length > 4) {
+        return NextResponse.json(
+          { error: true, message: "Cannot upload more than 4 hero images" } as ApiResponse,
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      for (const file of imageFiles) {
+        if (file && file.size > 0) {
+          const validImageTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+          if (!validImageTypes.includes(file.type)) {
+            return NextResponse.json(
+              { error: true, message: `Invalid image type: ${file.type}` } as ApiResponse,
+              { status: 400, headers: corsHeaders }
+            );
+          }
+          if (file.size > 5 * 1024 * 1024) {
+            return NextResponse.json(
+              { error: true, message: "Image size exceeds 5MB" } as ApiResponse,
+              { status: 400, headers: corsHeaders }
+            );
+          }
+          const timestamp = Date.now();
+          const ext = file.name.split(".").pop() || 'jpg';
+          const fileName = `hero-image-${timestamp}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+          const savedPath = await saveFileLocally(file, "uploads/images", fileName);
+          uploadedImageUrls.push(savedPath);
+        }
+      }
     }
 
     // Handle text fields
@@ -172,7 +212,9 @@ export async function POST(req: NextRequest) {
             title: title || "",
             subtitle: subtitle || "",
             videoUrl: videoUrl || parsedData.hero.videoUrl || "",
-            updated: new Date()
+            images: uploadedImageUrls.length > 0 ? uploadedImageUrls : (parsedData.hero.images || []),
+            createdAt: new Date(),
+            updatedAt: new Date()
           };
         }
       } catch (error) {
@@ -196,6 +238,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Use findOneAndUpdate with proper options
+
     const savedSettings = await Settings.findOneAndUpdate(
       {}, // Find any document (there should be only one settings document)
       { $set: updateData }, // Use $set to update only specified fields
@@ -205,6 +248,13 @@ export async function POST(req: NextRequest) {
         runValidators: true // Run schema validators on update
       }
     ).lean();
+
+    if (!savedSettings) {
+      return NextResponse.json(
+        { error: true, message: "Failed to save settings" } as ApiResponse,
+        { status: 500, headers: corsHeaders }
+      );
+    }
 
 
     return NextResponse.json(

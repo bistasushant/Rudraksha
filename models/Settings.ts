@@ -73,7 +73,17 @@ const settingsSchema = new Schema<ISettings>(
         type: String,
         required: false,
         trim: true,
-
+      },
+      images: {
+        type: [String],
+        required: false,
+        default: [],
+        validate: {
+          validator: function (images: string[]) {
+            return images.length <= 4;
+          },
+          message: "Cannot upload more than 4 images"
+        }
       },
       createdAt: {
         type: Date,
@@ -85,8 +95,15 @@ const settingsSchema = new Schema<ISettings>(
       },
     }
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    strict: true,
+    versionKey: false
+  }
 );
+
+// Add index to ensure only one settings document
+settingsSchema.index({}, { unique: true });
 
 const Settings =
   mongoose.models.Settings ||

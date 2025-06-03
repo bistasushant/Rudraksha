@@ -3,40 +3,53 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X, Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
-import { ICategory } from "@/types";
 import { toast } from "sonner";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import Image from "next/image";
+
+const convertFileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });
+};
 
 const EditCategoryForm = () => {
   const router = useRouter();
   const { admin } = useAuth();
   const [categoryName, setCategoryName] = useState("");
   const [description, setDescription] = useState("");
+  const [benefit, setBenefit] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [metaKeywords, setMetaKeywords] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [image, setImage] = useState<string | null>(null);
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // State for form errors
   const [formErrors, setFormErrors] = useState<{
     categoryName: string;
     seoTitle: string;
     metaDescription: string;
     metaKeywords: string;
+    image: string;
     general: string;
   }>({
     categoryName: "",
     seoTitle: "",
     metaDescription: "",
     metaKeywords: "",
+    image: "",
     general: "",
   });
 
@@ -48,10 +61,12 @@ const EditCategoryForm = () => {
       router.push("/admin");
       return;
     }
+
     if (!["admin", "editor"].includes(admin.role)) {
       router.push("/admin/dashboard/category");
       return;
     }
+
     const fetchCategory = async () => {
       if (!categorySlug) {
         setFormErrors((prev) => ({
@@ -61,56 +76,72 @@ const EditCategoryForm = () => {
         router.push("/admin/dashboard/category");
         return;
       }
+
       setIsLoading(true);
       try {
-        const response = await fetch("/api/category", {
+        // Fixed: Use template literal correctly and call the single category endpoint
+        const response = await fetch(`/api/category/${categorySlug}`, {
           headers: {
             Authorization: `Bearer ${admin.token}`,
           },
         });
 
         if (!response.ok) {
-          const errorData = await response.text();
+          const errorData = await response.json();
           throw new Error(
-            errorData || `Failed to fetch categories: ${response.status}`
+            errorData.message || `Failed to fetch category: ${response.status}`
           );
         }
 
         const data = await response.json();
-        const categories = Array.isArray(data.data?.categories)
-          ? data.data.categories
-          : [];
+        console.log(data)
 
-        const category = categories.find(
-          (cat: ICategory) => cat.slug === categorySlug
-        );
+        // Fixed: For single category endpoint, data.data contains the category directly
+        const category = data.data;
 
         if (!category) {
           throw new Error(`Category with slug "${categorySlug}" not found`);
         }
 
+        // Set form fields with the category data
         setCategoryName(category.name || "");
         setDescription(category.description || "");
+        setBenefit(category.benefit || "");
         setSeoTitle(category.seoTitle || "");
         setMetaDescription(category.metaDescription || "");
         setMetaKeywords(category.metaKeywords || "");
         setIsActive(category.isActive ?? true);
+        setImage(category.image || null);
+
+        // Clear any previous errors
+        setFormErrors({
+          categoryName: "",
+          seoTitle: "",
+          metaDescription: "",
+          metaKeywords: "",
+          image: "",
+          general: "",
+        });
       } catch (error) {
         console.error("Error fetching category:", error);
-        setFormErrors((prev) => ({
-          ...prev,
-          general:
-            error instanceof Error
-              ? error.message
-              : "Failed to load category data",
-        }));
-        toast.error(
+        const errorMessage =
           error instanceof Error
             ? error.message
-            : "Failed to load category data",
-          { description: "Redirecting to category list." }
-        );
-        router.push("/admin/dashboard/category");
+            : "Failed to load category data";
+
+        setFormErrors((prev) => ({
+          ...prev,
+          general: errorMessage,
+        }));
+
+        toast.error(errorMessage, {
+          description: "Redirecting to category list.",
+        });
+
+        // Add a small delay before redirect to show the toast
+        setTimeout(() => {
+          router.push("/admin/dashboard/category");
+        }, 2000);
       } finally {
         setIsLoading(false);
       }
@@ -119,27 +150,39 @@ const EditCategoryForm = () => {
     fetchCategory();
   }, [admin, categorySlug, router]);
 
-  const validateField = (name: string, value: string): string => {
+  const validateField = (name: string, value: string | File | null): string => {
     let error = "";
     switch (name) {
       case "categoryName":
-        if (!value?.trim()) {
+        if (!value?.toString().trim()) {
           error = "Category name cannot be empty.";
         }
         break;
       case "seoTitle":
-        if (value && value.length > 60) {
+        if (value && (value as string).length > 60) {
           error = "SEO title must be 60 characters or less.";
         }
         break;
       case "metaDescription":
-        if (value && value.length > 160) {
+        if (value && (value as string).length > 160) {
           error = "Meta description must be 160 characters or less.";
         }
         break;
       case "metaKeywords":
-        if (value && value.split(",").length > 10) {
+        if (value && (value as string).split(",").length > 10) {
           error = "Meta keywords must not exceed 10 keywords.";
+        }
+        break;
+      case "image":
+        if (value) {
+          const file = value as File;
+          const validTypes = ["image/jpeg", "image/png", "image/gif"];
+          if (!validTypes.includes(file.type)) {
+            error = "Image must be a JPEG, PNG, or GIF.";
+          } else if (file.size > 2 * 1024 * 1024) {
+            // 2MB limit
+            error = "Image size must be less than 2MB.";
+          }
         }
         break;
       default:
@@ -160,6 +203,9 @@ const EditCategoryForm = () => {
       case "description":
         setDescription(value);
         break;
+      case "benefit":
+        setBenefit(value);
+        break;
       case "seoTitle":
         setSeoTitle(value);
         break;
@@ -170,9 +216,7 @@ const EditCategoryForm = () => {
         setMetaKeywords(value);
         break;
     }
-
-    // Validate on change
-    const error = validateField("categoryName", value);
+    const error = validateField(field, value);
     setFormErrors((prev) => ({ ...prev, [field]: error }));
   };
 
@@ -185,21 +229,47 @@ const EditCategoryForm = () => {
     setFormErrors((prev) => ({ ...prev, [field]: error }));
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const error = validateField("image", file);
+      if (error) {
+        toast.error(error);
+        setFormErrors((prev) => ({ ...prev, image: error }));
+        return;
+      }
+      setNewImageFile(file);
+      setImage(URL.createObjectURL(file)); // Preview the new image
+      setFormErrors((prev) => ({ ...prev, image: "" }));
+    }
+  };
+
+  const removeImage = () => {
+    setNewImageFile(null);
+    setImage(null);
+    setFormErrors((prev) => ({ ...prev, image: "" }));
+  };
+
   const validateForm = () => {
     const errors = {
       categoryName: validateField("categoryName", categoryName),
       seoTitle: validateField("seoTitle", seoTitle),
       metaDescription: validateField("metaDescription", metaDescription),
       metaKeywords: validateField("metaKeywords", metaKeywords),
+      image: validateField("image", newImageFile),
       general: "",
     };
     setFormErrors(errors);
-
     return !Object.values(errors).some((error) => error);
   };
+
   const handleDescriptionChange = (html: string) => {
     setDescription(html);
   };
+  const handleBenefitChange = (html: string) => {
+    setBenefit(html);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -217,13 +287,15 @@ const EditCategoryForm = () => {
       return;
     }
 
-    const payload = {
+    const requestBody = {
       name: categoryName.trim(),
-      description: description.trim() || undefined,
-      seoTitle: seoTitle.trim() || undefined,
-      metaDescription: metaDescription.trim() || undefined,
-      metaKeywords: metaKeywords.trim() || undefined,
+      description: description || "",
+      benefit: benefit || "",
+      seoTitle: seoTitle.trim() || "",
+      metaDescription: metaDescription.trim() || "",
+      metaKeywords: metaKeywords.trim() || "",
       isActive,
+      ...(newImageFile && { image: await convertFileToBase64(newImageFile) }),
     };
 
     try {
@@ -233,7 +305,7 @@ const EditCategoryForm = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${admin.token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestBody),
       });
 
       const rawBody = await response.text();
@@ -250,8 +322,7 @@ const EditCategoryForm = () => {
         );
       }
       toast.success("Category updated successfully!");
-
-      router.push("/admin/dashboard/category");
+      router.push("/admin/dashboard/category?refresh=true");
     } catch (error) {
       console.error("Error updating category:", error);
       setFormErrors((prev) => ({
@@ -282,15 +353,16 @@ const EditCategoryForm = () => {
           Back
         </Button>
       </div>
-      <h1 className="text-2xl font-bold text-white mb-4">Edit Category</h1>
-
-      <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="text-white text-center py-4">
-              Loading category data...
-            </div>
-          ) : (
+      <h1 className="text-2xl font-bold text-white mb-4">
+        Edit Category: {categoryName || "Loading..."}
+      </h1>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      ) : (
+        <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
+          <CardContent className="pt-6">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6 md:border-r md:border-white/40 md:pr-6">
@@ -320,6 +392,67 @@ const EditCategoryForm = () => {
 
                   <div className="space-y-2">
                     <Label className="text-white/80">
+                      Category Image (Optional)
+                    </Label>
+                    <div className="relative group w-full max-w-md mx-auto">
+                      <label
+                        htmlFor="image-upload"
+                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${
+                          formErrors.image
+                            ? "border-red-500"
+                            : "border-white/30"
+                        }`}
+                      >
+                        {image ? (
+                          <div className="relative w-full h-full p-2">
+                            <Image
+                              src={image}
+                              alt="Category image preview"
+                              fill
+                              className="object-contain rounded-lg"
+                            />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeImage();
+                              }}
+                              className="absolute top-2 right-2 p-1 bg-red-500/80 rounded-full hover:bg-red-400 transition-colors"
+                            >
+                              <X className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload className="h-12 w-12 text-white/50 mb-2 group-hover:text-purple-400" />
+                            <span className="text-white/70 group-hover:text-purple-400">
+                              Click to upload an image
+                            </span>
+                            <span className="text-sm text-white/50">
+                              PNG, JPG, GIF (max. 2MB)
+                            </span>
+                          </>
+                        )}
+                      </label>
+                      <input
+                        id="image-upload"
+                        name="image"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif"
+                        className="hidden"
+                        onChange={handleImageChange}
+                        disabled={isSubmitting}
+                      />
+                      {formErrors.image && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {formErrors.image}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white/80">
                       Description (Optional)
                     </Label>
                     <RichTextEditor
@@ -327,6 +460,18 @@ const EditCategoryForm = () => {
                       onChange={handleDescriptionChange}
                       placeholder="Describe the category..."
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-white/80">
+                      Benefit (Optional)
+                    </Label>
+                    <RichTextEditor
+                      value={benefit}
+                      onChange={handleBenefitChange}
+                      placeholder="Describe the benefit..."
+                    />
+
                   </div>
 
                   <div className="space-y-2">
@@ -437,9 +582,9 @@ const EditCategoryForm = () => {
                 </Button>
               </div>
             </form>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

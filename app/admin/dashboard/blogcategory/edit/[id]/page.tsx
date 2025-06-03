@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
 import { toast } from "sonner";
-import { ICategory } from "@/types";
 import { Textarea } from "@/components/ui/textarea";
 
 const EditBlogCategoryForm = () => {
@@ -58,7 +57,7 @@ const EditBlogCategoryForm = () => {
       }
       setIsLoading(true);
       try {
-        const response = await fetch("/api/blogcategory", {
+        const response = await fetch(`/api/blogcategory/${blogCategorySlug}`, {
           headers: {
             Authorization: `Bearer ${admin.token}`,
           },
@@ -67,26 +66,19 @@ const EditBlogCategoryForm = () => {
         if (!response.ok) {
           const errorData = await response.text();
           throw new Error(
-            errorData || `Failed to fetch blog categories: ${response.status}`
+            errorData || `Failed to fetch blog category: ${response.status}`
           );
         }
 
         const data = await response.json();
 
-        // Access the categories array correctly
-        const blogCategories = Array.isArray(data.data?.blogCategories)
-          ? data.data.blogCategories
-          : [];
-
-        const blogCategory = blogCategories.find(
-          (cat: ICategory) => cat.slug === blogCategorySlug
-        );
-
-        if (!blogCategory) {
+        if (!data.data) {
           throw new Error(
             `Blog category with slug "${blogCategorySlug}" not found`
           );
         }
+
+        const blogCategory = data.data;
 
         setBlogCategoryName(blogCategory.name || "");
         setSeoTitle(blogCategory.seoTitle || "");
@@ -242,7 +234,7 @@ const EditBlogCategoryForm = () => {
         }
         throw new Error(
           errorData.message ||
-            `Failed to update blog category: ${response.status}`
+          `Failed to update blog category: ${response.status}`
         );
       }
 
@@ -288,20 +280,14 @@ const EditBlogCategoryForm = () => {
           Back
         </Button>
       </div>
-      <h1 className="text-2xl font-bold text-white mb-4">Edit Blog Category</h1>
-
-      <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
-        {/* <CardHeader>
-          <h2 className="text-lg font-bold text-white">
-            Blog Category Details
-          </h2>
-        </CardHeader> */}
-        <CardContent className="pt-6">
-          {isLoading ? (
-            <div className="text-white text-center py-4">
-              Loading Blog category data...
-            </div>
-          ) : (
+      <h1 className="text-2xl font-bold text-white mb-4">Edit Blog Category: {blogCategoryName || "Loading..."}</h1>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        </div>
+      ) : (
+        <Card className="bg-gradient-to-br from-slate-950 to-indigo-950 border border-white/40 max-w-5xl mx-auto">
+          <CardContent className="pt-6">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-6 md:border-r md:border-white/40 md:pr-6">
@@ -313,11 +299,10 @@ const EditBlogCategoryForm = () => {
                       Blog Category Name *
                     </Label>
                     <Input
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.blogCategoryName
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.blogCategoryName
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter blog category name"
                       required
                       value={blogCategoryName}
@@ -338,11 +323,10 @@ const EditBlogCategoryForm = () => {
                   <div className="space-y-2">
                     <Label className="text-white/80">SEO Title</Label>
                     <Input
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.seoTitle
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter SEO title (max 60 characters)"
                       value={seoTitle}
                       onChange={(e) => handleInputChange(e, "seoTitle")}
@@ -361,11 +345,10 @@ const EditBlogCategoryForm = () => {
                   <div className="space-y-2">
                     <Label className="text-white/80">Meta Description</Label>
                     <Textarea
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${
-                        formErrors.metaDescription
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta description (max 160 characters)"
                       value={metaDescription}
                       onChange={(e) => handleInputChange(e, "metaDescription")}
@@ -384,11 +367,10 @@ const EditBlogCategoryForm = () => {
                   <div className="space-y-2">
                     <Label className="text-white/80">Meta Keywords</Label>
                     <Input
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.metaKeywords
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta keywords (comma-separated, max 10)"
                       value={metaKeywords}
                       onChange={(e) => handleInputChange(e, "metaKeywords")}
@@ -426,9 +408,10 @@ const EditBlogCategoryForm = () => {
                 </Button>
               </div>
             </form>
-          )}
-        </CardContent>
-      </Card>
+
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

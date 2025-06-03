@@ -1,7 +1,7 @@
 "use client";
 import { ArrowRight } from "lucide-react";
 import { useState, useEffect } from "react";
-import { ProductCard } from "./product-card";
+import { ProductCard } from "./Product-Card";
 import { useLanguage } from "@/context/language-context";
 import {
   featureEnglishTexts,

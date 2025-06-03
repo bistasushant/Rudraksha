@@ -224,89 +224,95 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   await connectDB();
 
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const skip = (page - 1) * limit;
+    const { slug } = await params;
 
-    const total = await Product.countDocuments();
-    const products = await Product.find({})
-      .select("-image")
-      .skip(skip)
-      .limit(limit)
-      .lean<LeanProduct[]>();
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Product slug is required",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
 
-    const sanitizedProducts = products.map((product) => {
-      const images = Array.isArray(product.images) ? product.images : [];
-      const subcategoryIds = Array.isArray(product.subcategory)
-        ? product.subcategory.map((sub) => sub.toString())
-        : [];
-      return {
-        id: product._id.toString(),
-        name: product.name,
-        slug: product.slug,
-        category: product.category.map((cat) => cat.toString()),
-        subcategory: subcategoryIds,
-        price: product.price,
-        stock: product.stock,
-        description: product.description || "",
-        benefit: product.benefit || "",
-        seoTitle: product.seoTitle || "",
-        metaDescription: product.metaDescription || "",
-        metaKeywords: product.metaKeywords || "",
-        images,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt,
-      };
-    });
+    if (typeof slug !== "string") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Product slug must be a string",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    if (slug.length > 100) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Product slug too long (max 100 characters)",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+    const products = await Product.find({ slug })
+      .select("name slug category subcategory price stock description benefit seoTitle metaDescription metaKeywords images createdAt updatedAt")
+      .lean<LeanProduct | null>();
 
-    // New: Count products added this month
-    const startOfMonth = new Date(
-      new Date().getFullYear(),
-      new Date().getMonth(),
-      1
-    );
-    const newProductsCount = await Product.countDocuments({
-      createdAt: { $gte: startOfMonth },
-    });
-
-    const responseData: ApiResponse<{
-      products: IProduct[];
-      total: number;
-      newProductsCount: number;
-      page: number;
-      totalPages: number;
-    }> = {
+    if (!products) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Product not found",
+        } as ApiResponse,
+        { status: 404 }
+      );
+    }
+    const responseData: ApiResponse<LeanProduct> = {
       error: false,
       message: "Products retrieved successfully",
-      data: {
-        products: sanitizedProducts,
-        total,
-        newProductsCount,
-        page,
-        totalPages: Math.ceil(total / limit),
-      },
+      data: products,
     };
 
     return NextResponse.json(responseData, {
       status: 200,
       headers: {
-        "Access-Control-Allow-Origin": "http://localhost:3000",
-        "Access-Control-Allow-Methods": "GET, POST",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
       },
     });
   } catch (error) {
-    console.error("Get Products Error:", error);
+    console.error("Get Product Error:", error);
+
+    if (error instanceof mongoose.Error.CastError) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Invalid product format",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof mongoose.Error) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Database error occurred",
+        } as ApiResponse,
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: true,
         message: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
       } as ApiResponse,
       { status: 500 }
     );

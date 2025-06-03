@@ -1,21 +1,25 @@
-import fs from "fs";
-import path from "path";
+import { writeFile } from 'fs/promises';
+import { join } from 'path';
+import { mkdir } from 'fs/promises';
 
-export async function saveFileLocally(file: File, folder: string, fileName: string) {
-    // Create folder path if not exists
-    const uploadDir = path.join(process.cwd(), "public", folder);
-    if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
+export async function saveFileLocally(file: File, directory: string, fileName: string): Promise<string> {
+    try {
+        // Convert File to Buffer
+        const bytes = await file.arrayBuffer();
+        const buffer = Buffer.from(bytes);
+
+        // Create directory if it doesn't exist
+        const uploadDir = join(process.cwd(), 'public', directory);
+        await mkdir(uploadDir, { recursive: true });
+
+        // Save file
+        const filePath = join(uploadDir, fileName);
+        await writeFile(filePath, buffer);
+
+        // Return the public URL path
+        return `/${directory}/${fileName}`;
+    } catch (error) {
+        console.error('Error saving file:', error);
+        throw new Error('Failed to save file');
     }
-
-    // Create a writable stream for saving file
-    const filePath = path.join(uploadDir, fileName);
-
-    // Convert File to buffer and write
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.promises.writeFile(filePath, buffer);
-
-    // Return the relative URL for accessing this file
-    const publicUrl = `/${folder}/${fileName}`;
-    return publicUrl;
 }

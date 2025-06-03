@@ -29,7 +29,7 @@ export default function SetPricePage() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/currency", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

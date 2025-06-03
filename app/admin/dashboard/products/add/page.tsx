@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { ICategory, ISubCategory } from "@/types";
 import { Types } from "mongoose";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import { useDebounce } from "@/hooks/useDebounce";
 
 // Utility to generate slug from product name
 const generateSlug = (name: string): string => {
@@ -21,23 +22,6 @@ const generateSlug = (name: string): string => {
     .replace(/[^a-z0-9 -]/g, "")
     .replace(/\s+/g, "-")
     .trim();
-};
-
-// Custom debounce hook
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
 };
 
 interface FormValues {
@@ -136,7 +120,7 @@ const AddProductForm: React.FC = () => {
 
     const fetchCurrency = async () => {
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/currency", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -821,8 +805,8 @@ const AddProductForm: React.FC = () => {
                     <Input
                       name="productName"
                       className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.productName
-                          ? "border-red-500"
-                          : "border-white/20"
+                        ? "border-red-500"
+                        : "border-white/20"
                         }`}
                       placeholder="Enter product name"
                       value={formValues.productName}
@@ -843,8 +827,8 @@ const AddProductForm: React.FC = () => {
                       <button
                         type="button"
                         className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${formErrors.categories
-                            ? "border-red-500 border"
-                            : "border-white/20"
+                          ? "border-red-500 border"
+                          : "border-white/20"
                           }`}
                         onClick={() =>
                           setIsCategoryDropdownOpen(!isCategoryDropdownOpen)
@@ -908,8 +892,8 @@ const AddProductForm: React.FC = () => {
                               <div
                                 key={category.id}
                                 className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${selectedCategories.includes(category.id ?? "")
-                                    ? "bg-purple-600/70"
-                                    : ""
+                                  ? "bg-purple-600/70"
+                                  : ""
                                   }`}
                                 onClick={() =>
                                   handleCategoryToggle(category.id ?? "")
@@ -942,8 +926,8 @@ const AddProductForm: React.FC = () => {
                       <button
                         type="button"
                         className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${formErrors.subcategories
-                            ? "border-red-500 border"
-                            : "border-white/20"
+                          ? "border-red-500 border"
+                          : "border-white/20"
                           }`}
                         onClick={() =>
                           setIsSubcategoryDropdownOpen(
@@ -1016,8 +1000,8 @@ const AddProductForm: React.FC = () => {
                                   className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${selectedSubcategories.includes(
                                     subcategory.id ?? ""
                                   )
-                                      ? "bg-purple-600/70"
-                                      : ""
+                                    ? "bg-purple-600/70"
+                                    : ""
                                     }`}
                                   onClick={() =>
                                     handleSubcategoryToggle(
@@ -1076,8 +1060,8 @@ const AddProductForm: React.FC = () => {
                       name="stockQuantity"
                       type="number"
                       className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.stockQuantity
-                          ? "border-red-500"
-                          : "border-white/20"
+                        ? "border-red-500"
+                        : "border-white/20"
                         }`}
                       placeholder="Enter quantity"
                       value={formValues.stockQuantity}
@@ -1153,8 +1137,8 @@ const AddProductForm: React.FC = () => {
                   <Textarea
                     name="metaDescription"
                     className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription
-                        ? "border-red-500"
-                        : "border-white/20"
+                      ? "border-red-500"
+                      : "border-white/20"
                       }`}
                     placeholder="Enter meta description (max 160 characters)"
                     value={formValues.metaDescription}
@@ -1177,8 +1161,8 @@ const AddProductForm: React.FC = () => {
                   <Input
                     name="metaKeywords"
                     className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords
-                        ? "border-red-500"
-                        : "border-white/20"
+                      ? "border-red-500"
+                      : "border-white/20"
                       }`}
                     placeholder="Enter meta keywords (comma-separated, max 10)"
                     value={formValues.metaKeywords}

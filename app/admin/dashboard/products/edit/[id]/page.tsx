@@ -8,20 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/app/admin/providers/AuthProviders";
-import { ICategory, IProduct } from "@/types";
+import { ICategory } from "@/types";
 import Image from "next/image";
 import RichTextEditor from "@/components/admin/RichTextEditor";
 import { toast } from "sonner";
-
-// Debounce hook for search inputs
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedValue(value), delay);
-    return () => clearTimeout(handler);
-  }, [value, delay]);
-  return debouncedValue;
-};
+import { useDebounce } from "@/hooks/useDebounce";
 
 // Interface for subcategory with parent category
 interface ICategoryWithParent extends ICategory {
@@ -99,7 +90,7 @@ const EditProductForm = () => {
 
     const fetchCurrency = async () => {
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/currency", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -167,23 +158,27 @@ const EditProductForm = () => {
       try {
         setLoading(true);
 
-        // Fetch product
+        // Fixed: Use the correct API endpoint structure
         const productResponse = await fetch(`/api/products/${routeId}`, {
+          method: "GET",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${admin.token}`,
           },
           cache: "no-store",
         });
+
         if (!productResponse.ok) {
           const errorData = await productResponse.json();
           throw new Error(errorData.message || "Failed to fetch product");
         }
+
         const productResult = await productResponse.json();
-        const productData =
-          productResult.data.products?.find(
-            (p: IProduct) => p.slug === routeId || p.id === routeId
-          ) || productResult.data;
+
+        // Fixed: Handle the array response from your API
+        const productData = Array.isArray(productResult.data)
+          ? productResult.data[0] // Get first product from array
+          : productResult.data;
 
         if (!productData) {
           throw new Error("Product not found");
@@ -211,24 +206,24 @@ const EditProductForm = () => {
         setSelectedCategories(
           Array.isArray(productData.category)
             ? productData.category.map((cat: ICategory | string) =>
-                typeof cat === "string"
-                  ? cat
-                  : cat.id?.toString() || cat.id?.toString()
-              )
+              typeof cat === "string"
+                ? cat
+                : cat.id?.toString() || cat.id?.toString()
+            )
             : productData.category
-            ? [productData.category.toString()]
-            : []
+              ? [productData.category.toString()]
+              : []
         );
         setSelectedSubcategories(
           Array.isArray(productData.subcategory)
             ? productData.subcategory.map((sub: ICategory | string) =>
-                typeof sub === "string"
-                  ? sub
-                  : sub.id?.toString() || sub.id?.toString()
-              )
+              typeof sub === "string"
+                ? sub
+                : sub.id?.toString() || sub.id?.toString()
+            )
             : productData.subcategory
-            ? [productData.subcategory.toString()]
-            : []
+              ? [productData.subcategory.toString()]
+              : []
         );
 
         // Fetch categories
@@ -258,9 +253,9 @@ const EditProductForm = () => {
         const transformedSubcategories = fetchedSubcategories.map(
           (sub: Omit<ICategoryWithParent, "category_id"> & {
             category_id?:
-              | string
-              | { id: string; name: string }
-              | { _id: string; name: string };
+            | string
+            | { id: string; name: string }
+            | { _id: string; name: string };
           }) => {
             // Handle different category formats
             let parentId: string | undefined;
@@ -307,8 +302,6 @@ const EditProductForm = () => {
           }
         ) as ICategoryWithParent[];
 
-
-
         setSubcategories(transformedSubcategories);
       } catch (error) {
         console.error("Fetch Data Error:", error);
@@ -337,37 +330,37 @@ const EditProductForm = () => {
         prev.filter((subId) => {
           const subcategory = subcategories.find((sub) => sub.id === subId);
           if (!subcategory) return false;
-          
+
           // Check if any of the subcategory's categories are in the selected categories
-          const hasMatchingCategory = Array.isArray(subcategory.category) 
+          const hasMatchingCategory = Array.isArray(subcategory.category)
             ? subcategory.category.some(cat => {
-                if (!cat) return false;
-                let categoryId: string;
-                
-                if (typeof cat === 'object' && cat !== null) {
-                  if ('id' in cat && cat.id) {
-                    categoryId = cat.id.toString();
-                  } else if ('_id' in cat && cat._id) {
-                    categoryId = cat._id.toString();
-                  } else {
-                    return false;
-                  }
-                } else if (cat) {
-                  categoryId = cat.toString();
+              if (!cat) return false;
+              let categoryId: string;
+
+              if (typeof cat === 'object' && cat !== null) {
+                if ('id' in cat && cat.id) {
+                  categoryId = cat.id.toString();
+                } else if ('_id' in cat && cat._id) {
+                  categoryId = cat._id.toString();
                 } else {
                   return false;
                 }
-                
-                return selectedCategories.includes(categoryId);
-              })
+              } else if (cat) {
+                categoryId = cat.toString();
+              } else {
+                return false;
+              }
+
+              return selectedCategories.includes(categoryId);
+            })
             : false;
-            
+
           // Also check parentId and category_id for backward compatibility
-          const hasMatchingParent = selectedCategories.some(catId => 
-            catId === subcategory.parentId || 
+          const hasMatchingParent = selectedCategories.some(catId =>
+            catId === subcategory.parentId ||
             (typeof subcategory.category_id === 'string' && catId === subcategory.category_id)
           );
-          
+
           return hasMatchingCategory || hasMatchingParent;
         })
       );
@@ -647,37 +640,37 @@ const EditProductForm = () => {
 
     return subcategories.filter((subcategory: ICategoryWithParent) => {
       // Check if any of the subcategory's categories are in the selected categories
-      const hasMatchingCategory = Array.isArray(subcategory.category) 
+      const hasMatchingCategory = Array.isArray(subcategory.category)
         ? subcategory.category.some(cat => {
-            if (!cat) return false;
-            let categoryId: string;
-            
-            if (typeof cat === 'object' && cat !== null) {
-              if ('id' in cat && cat.id) {
-                categoryId = cat.id.toString();
-              } else if ('_id' in cat && cat._id) {
-                categoryId = cat._id.toString();
-              } else {
-                return false;
-              }
-            } else if (cat) {
-              categoryId = cat.toString();
+          if (!cat) return false;
+          let categoryId: string;
+
+          if (typeof cat === 'object' && cat !== null) {
+            if ('id' in cat && cat.id) {
+              categoryId = cat.id.toString();
+            } else if ('_id' in cat && cat._id) {
+              categoryId = cat._id.toString();
             } else {
               return false;
             }
-            
-            return selectedCategories.includes(categoryId);
-          })
+          } else if (cat) {
+            categoryId = cat.toString();
+          } else {
+            return false;
+          }
+
+          return selectedCategories.includes(categoryId);
+        })
         : false;
 
       // Also check parentId and category_id for backward compatibility
-      const hasMatchingParent = selectedCategories.some(catId => 
-        catId === subcategory.parentId || 
+      const hasMatchingParent = selectedCategories.some(catId =>
+        catId === subcategory.parentId ||
         (typeof subcategory.category_id === 'string' && catId === subcategory.category_id) ||
-        (typeof subcategory.category_id === 'object' && 
-         subcategory.category_id !== null && 
-         'id' in subcategory.category_id && 
-         catId === subcategory.category_id.id.toString())
+        (typeof subcategory.category_id === 'object' &&
+          subcategory.category_id !== null &&
+          'id' in subcategory.category_id &&
+          catId === subcategory.category_id.id.toString())
       );
 
       const matchesSearch = subcategory.name
@@ -729,11 +722,10 @@ const EditProductForm = () => {
                     <div className="relative group w-full max-w-md mx-auto">
                       <label
                         htmlFor="image-upload"
-                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${
-                          formErrors.images
-                            ? "border-red-500"
-                            : "border-white/30"
-                        }`}
+                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${formErrors.images
+                          ? "border-red-500"
+                          : "border-white/30"
+                          }`}
                       >
                         {selectedImages.length > 0 ? (
                           <div className="grid grid-cols-3 gap-2 w-full h-full p-2 overflow-auto">
@@ -793,9 +785,8 @@ const EditProductForm = () => {
                     <Label className="text-white/80">Product Name *</Label>
                     <Input
                       name="name"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.name ? "border-red-500" : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.name ? "border-red-500" : "border-white/20"
+                        }`}
                       placeholder="Enter product name"
                       value={formValues.name}
                       onChange={handleInputChange}
@@ -812,11 +803,10 @@ const EditProductForm = () => {
                     <div className="relative">
                       <button
                         type="button"
-                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${
-                          formErrors.categories
-                            ? "border-red-500 border"
-                            : "border-white/20"
-                        }`}
+                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${formErrors.categories
+                          ? "border-red-500 border"
+                          : "border-white/20"
+                          }`}
                         onClick={() =>
                           setIsCategoryDropdownOpen(!isCategoryDropdownOpen)
                         }
@@ -853,9 +843,8 @@ const EditProductForm = () => {
                           )}
                         </div>
                         <ChevronDown
-                          className={`h-5 w-5 text-white/50 transition-transform ${
-                            isCategoryDropdownOpen ? "rotate-180" : ""
-                          }`}
+                          className={`h-5 w-5 text-white/50 transition-transform ${isCategoryDropdownOpen ? "rotate-180" : ""
+                            }`}
                         />
                       </button>
                       {isCategoryDropdownOpen && (
@@ -876,11 +865,10 @@ const EditProductForm = () => {
                             filteredCategories.map((category) => (
                               <div
                                 key={category.id}
-                                className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${
-                                  selectedCategories.includes(category.id)
-                                    ? "bg-purple-600/70"
-                                    : ""
-                                }`}
+                                className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${selectedCategories.includes(category.id)
+                                  ? "bg-purple-600/70"
+                                  : ""
+                                  }`}
                                 onClick={() =>
                                   handleCategoryToggle(category.id)
                                 }
@@ -912,11 +900,10 @@ const EditProductForm = () => {
                     <div className="relative">
                       <button
                         type="button"
-                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${
-                          formErrors.subcategories
-                            ? "border-red-500 border"
-                            : "border-white/20"
-                        }`}
+                        className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gray-500 ${formErrors.subcategories
+                          ? "border-red-500 border"
+                          : "border-white/20"
+                          }`}
                         onClick={() =>
                           setIsSubcategoryDropdownOpen(
                             !isSubcategoryDropdownOpen
@@ -955,9 +942,8 @@ const EditProductForm = () => {
                           )}
                         </div>
                         <ChevronDown
-                          className={`h-5 w-5 text-white/50 transition-transform ${
-                            isSubcategoryDropdownOpen ? "rotate-180" : ""
-                          }`}
+                          className={`h-5 w-5 text-white/50 transition-transform ${isSubcategoryDropdownOpen ? "rotate-180" : ""
+                            }`}
                         />
                       </button>
                       {isSubcategoryDropdownOpen && (
@@ -978,11 +964,10 @@ const EditProductForm = () => {
                             filteredSubcategories.map((subcategory) => (
                               <div
                                 key={subcategory.id}
-                                className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${
-                                  selectedSubcategories.includes(subcategory.id)
-                                    ? "bg-purple-600/70"
-                                    : ""
-                                }`}
+                                className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${selectedSubcategories.includes(subcategory.id)
+                                  ? "bg-purple-600/70"
+                                  : ""
+                                  }`}
                                 onClick={() =>
                                   handleSubcategoryToggle(subcategory.id)
                                 }
@@ -1016,9 +1001,8 @@ const EditProductForm = () => {
                     <Input
                       name="price"
                       type="number"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.price ? "border-red-500" : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.price ? "border-red-500" : "border-white/20"
+                        }`}
                       placeholder="0.00"
                       value={formValues.price}
                       onChange={handleInputChange}
@@ -1037,9 +1021,8 @@ const EditProductForm = () => {
                     <Input
                       name="stock"
                       type="number"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.stock ? "border-red-500" : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.stock ? "border-red-500" : "border-white/20"
+                        }`}
                       placeholder="Enter quantity"
                       value={formValues.stock}
                       onChange={handleInputChange}
@@ -1093,11 +1076,10 @@ const EditProductForm = () => {
                     <Label className="text-white/80">SEO Title</Label>
                     <Input
                       name="seoTitle"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.seoTitle
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter SEO title (max 60 characters)"
                       value={formValues.seoTitle}
                       onChange={handleInputChange}
@@ -1118,11 +1100,10 @@ const EditProductForm = () => {
                     <Label className="text-white/80">Meta Description</Label>
                     <Textarea
                       name="metaDescription"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${
-                        formErrors.metaDescription
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta description (max 160 characters)"
                       value={formValues.metaDescription}
                       onChange={handleInputChange}
@@ -1143,11 +1124,10 @@ const EditProductForm = () => {
                     <Label className="text-white/80">Meta Keywords</Label>
                     <Input
                       name="metaKeywords"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.metaKeywords
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta keywords (comma-separated, max 10)"
                       value={formValues.metaKeywords}
                       onChange={handleInputChange}

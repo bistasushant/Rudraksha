@@ -30,7 +30,7 @@ const Stats = () => {
     }
     try {
       setLoadingProducts(true);
-      const response = await fetch("/api/products?page=1&limit=1", {
+      const response = await fetch("/api/products/stats", {
         headers: {
           Authorization: `Bearer ${admin.token}`,
           "Content-Type": "application/json",
@@ -67,7 +67,7 @@ const Stats = () => {
     }
     try {
       setLoadingCustomers(true);
-      const response = await fetch("/api/customer?page=1&limit=1", {
+      const response = await fetch("/api/customer/customer-count", {
         headers: {
           Authorization: `Bearer ${admin.token}`,
           "Content-Type": "application/json",
@@ -79,6 +79,7 @@ const Stats = () => {
         throw new Error(errorData.message || "Failed to fetch customers count");
       }
       const result = await response.json();
+      console.log(result)
       setCustomerCount(result.data?.pagination?.total || 0);
       setNewCustomersCount(result.data?.newCustomersCount || 0);
     } catch (error) {
@@ -196,8 +197,8 @@ const Stats = () => {
                 ? "Loading..."
                 : orderStats?.percentageChange !== undefined &&
                   orderStats.percentageChange >= 0
-                ? `+${orderStats.percentageChange}% from last month`
-                : `${orderStats?.percentageChange || 0}% from last month`}
+                  ? `+${orderStats.percentageChange}% from last month`
+                  : `${orderStats?.percentageChange || 0}% from last month`}
             </p>
           </CardContent>
         </Card>

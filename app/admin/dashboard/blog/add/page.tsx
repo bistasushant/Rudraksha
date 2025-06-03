@@ -12,6 +12,7 @@ import { useAuth } from "@/app/admin/providers/AuthProviders";
 import { toast } from "sonner";
 import { IBlogcategory } from "@/types";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const generateSlug = (name: string): string => {
   return name
@@ -19,22 +20,6 @@ const generateSlug = (name: string): string => {
     .replace(/[^a-z0-9 -]/g, "")
     .replace(/\s+/g, "-")
     .trim();
-};
-
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
 };
 
 interface FormValues {

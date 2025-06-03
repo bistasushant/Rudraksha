@@ -5,6 +5,8 @@ import {
   validateUpdateBlogCategoryRequest,
 } from "@/lib/validation";
 import { blogCategory } from "@/models/BlogCategory";
+import { ApiResponse, IBlogcategory } from "@/types";
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(req: NextRequest) {
@@ -131,6 +133,104 @@ export async function DELETE(req: NextRequest) {
     console.error("Delete Blog Category Error:", error);
     return NextResponse.json(
       { error: true, message: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  await connectDB();
+
+  try {
+    const { slug } = await params;
+
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog category slug is required",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (typeof slug !== "string") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog category slug must be a string",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (slug.length > 100) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog category slug too long (max 100 characters)",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    const foundBlogCategory = await blogCategory.findOne({ slug })
+      .select("name slug seoTitle metaDescription metaKeywords createdAt updatedAt")
+      .lean<IBlogcategory | null>();
+
+    if (!foundBlogCategory) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog category not found",
+        } as ApiResponse,
+        { status: 404 }
+      );
+    }
+
+    const responseData: ApiResponse<IBlogcategory> = {
+      error: false,
+      message: "Blog category retrieved successfully",
+      data: foundBlogCategory,
+    };
+
+    return NextResponse.json(responseData, {
+      status: 200,
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
+      },
+    });
+  } catch (error) {
+    console.error("Get Category Error:", error);
+
+    if (error instanceof mongoose.Error.CastError) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Invalid blog category format",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof mongoose.Error) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Database error occurred",
+        } as ApiResponse,
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: true,
+        message: "Internal server error",
+      } as ApiResponse,
       { status: 500 }
     );
   }

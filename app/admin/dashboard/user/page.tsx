@@ -35,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface UserProfile {
   id: string;
@@ -45,22 +46,6 @@ interface UserProfile {
   contactNumber?: string;
   createdAt?: string;
 }
-
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 const UserPage = () => {
   const [userSearchTerm, setUserSearchTerm] = useState<string>("");
@@ -98,7 +83,7 @@ const UserPage = () => {
           throw new Error(data.message || "Failed to fetch profiles");
         }
 
-        setUsers(admin.role === "admin" ? data.data : []);
+        setUsers(Array.isArray(data.data?.users) ? data.data.users : []);
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to fetch profiles",

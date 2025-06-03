@@ -5,7 +5,7 @@ import Benefits from "@/components/sections/Benefits";
 import Footer from "@/components/layout/Footer";
 import Header from "@/components/layout/Header";
 import ValueProposition from "@/components/sections/Value-Proposotion";
-import Categories from "@/components/sections/Categories";
+import Categories from "@/components/sections/category/Categories";
 import LimitedTimeDeal from "@/components/sections/Limited-Time-Deal";
 import Banner from "@/components/sections/Banner";
 import TopSelling from "@/components/sections/Top-Selling";

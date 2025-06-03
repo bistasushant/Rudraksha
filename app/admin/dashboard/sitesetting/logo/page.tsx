@@ -23,7 +23,7 @@ export default function LogoPage() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/logo", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -202,7 +202,7 @@ export default function LogoPage() {
         });
         throw new Error(
           errorData.message ||
-            `Error: ${response.status} ${response.statusText}`
+          `Error: ${response.status} ${response.statusText}`
         );
       }
 

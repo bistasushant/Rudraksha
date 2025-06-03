@@ -11,14 +11,12 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import DashboardContent from "@/components/dashboard-content";
-import OrderHistory from "@/components/order-history";
-import Wishlist from "./wishlist";
-import Profile from "./profile";
-import ChangePassword from "./change-password";
 import { toast } from "sonner";
+import { useRouter, usePathname } from "next/navigation";
 
 export default function Dashboard() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [username, setUsername] = useState("");
   const [userEmail, setUserEmail] = useState("");
@@ -27,6 +25,42 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [cartItemCount, setCartItemCount] = useState(0);
   const prevCartCount = useRef(0);
+
+  useEffect(() => {
+    // Set active tab based on current pathname
+    if (pathname === "/dashboard") {
+      setActiveTab("dashboard");
+    } else if (pathname === "/dashboard/order-history") {
+      setActiveTab("orders");
+    } else if (pathname === "/dashboard/wishlist") {
+      setActiveTab("wishlist");
+    } else if (pathname === "/dashboard/profile") {
+      setActiveTab("profile");
+    } else if (pathname === "/dashboard/password") {
+      setActiveTab("password");
+    }
+  }, [pathname]);
+
+  const handleNavigation = (tab: string) => {
+    setActiveTab(tab);
+    switch (tab) {
+      case "dashboard":
+        router.push("/dashboard");
+        break;
+      case "orders":
+        router.push("/dashboard/order-history");
+        break;
+      case "wishlist":
+        router.push("/dashboard/wishlist");
+        break;
+      case "profile":
+        router.push("/dashboard/profile");
+        break;
+      case "password":
+        router.push("/dashboard/password");
+        break;
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -180,99 +214,58 @@ export default function Dashboard() {
     </Button>
   );
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case "dashboard":
-        return <DashboardContent />;
-      case "orders":
-        return <OrderHistory />;
-      case "wishlist":
-        return <Wishlist />;
-      case "profile":
-        return <Profile />;
-      case "password":
-        return <ChangePassword />;
-      default:
-        return <DashboardContent />;
-    }
-  };
-
   return (
-    <div className="flex min-h-screen dark:from-gray-900 dark:via-gray-900 dark:to-gray-800">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex flex-col w-80 border-r border-gray-200/60 dark:border-gray-700/60 bg-charcoalBlack dark:bg-gray-900/80 backdrop-blur-xl">
-        <div className="p-6 border-b border-gray-200/60 dark:border-gray-700/60 mt-20">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Avatar className="h-12 w-12 border-3 border-[#B87333] shadow-lg">
-                <AvatarImage
-                  src={userImage ? (userImage.startsWith('/public') ? userImage.substring(7) : userImage) : "/placeholder.svg"}
-                  alt={username || "User"}
-                  className="object-cover"
-                />
-                <AvatarFallback className="bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 font-semibold">
-                  {isLoading ? "..." : username ? username.substring(0, 2).toUpperCase() : "U"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
-                <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-ivoryWhite dark:text-white truncate">
-                {isLoading ? "Loading..." : error ? "Error loading data" : username || "Guest"}
-              </p>
-              <p className="text-xs text-ivoryWhite dark:text-gray-400 truncate">
-                {isLoading ? "Loading..." : error ? "Please try again" : userEmail || "No email"}
-              </p>
+    <div className="hidden md:flex flex-col w-80 border-r border-gray-200/60 dark:border-gray-700/60 bg-charcoalBlack dark:bg-gray-900/80 backdrop-blur-xl">
+      <div className="p-6 border-b border-gray-200/60 dark:border-gray-700/60 mt-20">
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <Avatar className="h-12 w-12 border-3 border-[#B87333] shadow-lg">
+              <AvatarImage
+                src={userImage ? (userImage.startsWith('/public') ? userImage.substring(7) : userImage) : "/placeholder.svg"}
+                alt={username || "User"}
+                className="object-cover"
+              />
+              <AvatarFallback className="bg-gradient-to-br from-indigo-100 to-purple-100 text-indigo-700 font-semibold">
+                {isLoading ? "..." : username ? username.substring(0, 2).toUpperCase() : "U"}
+              </AvatarFallback>
+            </Avatar>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-2 border-white flex items-center justify-center">
+              <div className="w-1.5 h-1.5 bg-white rounded-full" />
             </div>
           </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-auto py-6">
-          <div className="space-y-2 px-4">
-            <NavButton icon={Home} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => setActiveTab("dashboard")} />
-            <NavButton icon={History} label="Order History" isActive={activeTab === "orders"} onClick={() => setActiveTab("orders")} />
-            <NavButton icon={Heart} label="Wishlist" isActive={activeTab === "wishlist"} onClick={() => setActiveTab("wishlist")} />
-            <NavButton icon={User} label="My Profile" isActive={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
-            <NavButton icon={Lock} label="Change Password" isActive={activeTab === "password"} onClick={() => setActiveTab("password")} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-ivoryWhite dark:text-white truncate">
+              {isLoading ? "Loading..." : error ? "Error loading data" : username || "Guest"}
+            </p>
+            <p className="text-xs text-ivoryWhite dark:text-gray-400 truncate">
+              {isLoading ? "Loading..." : error ? "Please try again" : userEmail || "No email"}
+            </p>
           </div>
-        </nav>
-
-        {/* Logout Section */}
-        <div className="border-t border-gray-200/60 dark:border-gray-700/60 p-4">
-          <Button
-            variant="ghost"
-            className="group relative w-4/5 bg-gradient-to-r from-red-400 via-red-700 to-red-800 text-ivoryWhite font-bold rounded-2xl border-2 border-[#D4AF37]/20 overflow-hidden transation-all duration-300 hover:scale-105 hover-shadow-xl hover:shadow-red-500/25  hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all hover:scale-[1.02]"
-            onClick={handleLogout}
-          >
-            <LogOut className="mr-3 h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
-            <span className="font-medium">Logout</span>
-          </Button>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col">
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-auto p-4 md:p-8 bg-gradient-to-br from-[#1C1C1C] via-gray-900 to-[#1C1C1C] dark:via-gray-900/30">
-          <div className="animate-fadeIn">
-            {renderContent()}
-          </div>
-        </main>
-      </div>
+      {/* Navigation */}
+      <nav className="flex-1 overflow-auto py-6">
+        <div className="space-y-2 px-4">
+          <NavButton icon={Home} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => handleNavigation("dashboard")} />
+          <NavButton icon={History} label="Order History" isActive={activeTab === "orders"} onClick={() => handleNavigation("orders")} />
+          <NavButton icon={Heart} label="Wishlist" isActive={activeTab === "wishlist"} onClick={() => handleNavigation("wishlist")} />
+          <NavButton icon={User} label="My Profile" isActive={activeTab === "profile"} onClick={() => handleNavigation("profile")} />
+          <NavButton icon={Lock} label="Change Password" isActive={activeTab === "password"} onClick={() => handleNavigation("password")} />
+        </div>
+      </nav>
 
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.6s ease-out forwards;
-        }
-      `}</style>
+      {/* Logout Section */}
+      <div className="border-t border-gray-200/60 dark:border-gray-700/60 p-4">
+        <Button
+          variant="ghost"
+          className="group relative w-4/5 bg-gradient-to-r from-red-400 via-red-700 to-red-800 text-ivoryWhite font-bold rounded-2xl border-2 border-[#D4AF37]/20 overflow-hidden transation-all duration-300 hover:scale-105 hover-shadow-xl hover:shadow-red-500/25  hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all hover:scale-[1.02]"
+          onClick={handleLogout}
+        >
+          <LogOut className="mr-3 h-5 w-5 transition-transform duration-300 group-hover:scale-110" />
+          <span className="font-medium">Logout</span>
+        </Button>
+      </div>
     </div>
   );
 }

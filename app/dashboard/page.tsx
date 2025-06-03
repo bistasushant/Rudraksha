@@ -1,14 +1,9 @@
-import React from 'react'
-import Dashboard from '@/components/dashboard'
-import Header from '@/components/layout/Header'
-import Footer from '@/components/layout/Footer'
+import DashboardContent from '@/components/Dashboard-Content'
 
-export default function dashboard() {
+export default function DetailPage() {
   return (
-    <>
-      <Header />
-      <Dashboard />
-      <Footer />
-    </>
+    <div className="w-full">
+      <DashboardContent />
+    </div>
   )
-};
+}

@@ -23,7 +23,7 @@ export default function GoogleAnalyticsPage() {
 
       setIsLoading(true);
       try {
-        const response = await fetch("/api/sitesetting/setting", {
+        const response = await fetch("/api/sitesetting/setting/google-analytics", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",

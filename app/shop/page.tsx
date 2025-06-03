@@ -1,6 +1,6 @@
 "use client";
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { ProductCard } from "@/components/product-card";
+import { useState, useMemo, useEffect } from "react";
+import { ProductCard } from "@/components/Product-Card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X, Search, Filter, Sparkles, Grid3X3, List, ShoppingBag } from "lucide-react";
@@ -17,6 +17,7 @@ import {
 } from "@/language";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface Category {
   id: string;
@@ -68,11 +69,13 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+
   // Filter states
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedSubcategories, setSelectedSubcategories] = useState<string[]>([]);
   const [showInStockOnly, setShowInStockOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 1000);
   const [sortOption, setSortOption] = useState("featured");
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -82,7 +85,10 @@ export default function ShopPage() {
   const [maxPrice, setMaxPrice] = useState("5000");
   const [minMaxPrice, setMinMaxPrice] = useState({ min: 0, max: 5000 });
   const [isPriceFilterActive, setIsPriceFilterActive] = useState(false);
-  const [debouncedPriceTimer, setDebouncedPriceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const debouncedMinPrice = useDebounce(minPrice, 1000);
+  const debouncedMaxPrice = useDebounce(maxPrice, 1000);
+  const debouncedPriceRange = useDebounce(JSON.stringify(priceRange), 1000);
 
   // Language texts
   const shopTexts =
@@ -262,26 +268,16 @@ export default function ShopPage() {
   const handleInStockChange = (checked: boolean) => setShowInStockOnly(checked);
 
   // Price filter handlers
-  const updatePriceRangeWithDebounce = useCallback(
-    (min: number, max: number) => {
-      if (debouncedPriceTimer) clearTimeout(debouncedPriceTimer);
-
-      const timer = setTimeout(() => {
-        setPriceRange([min, max]);
-        setIsPriceFilterActive(true);
-      }, 500);
-
-      setDebouncedPriceTimer(timer);
-    },
-    [debouncedPriceTimer]
-  );
-
   const handlePriceInputChange = (type: "min" | "max", value: string) => {
+    // Allow empty string for backspace
     if (value === "") {
       if (type === "min") setMinPrice("");
       else setMaxPrice("");
       return;
     }
+
+    // Only allow numbers
+    if (!/^\d*$/.test(value)) return;
 
     const numValue = Number(value);
     if (isNaN(numValue)) return;
@@ -291,30 +287,49 @@ export default function ShopPage() {
     if (type === "min") {
       const validMin = Math.max(0, Math.min(numValue, Number(maxPrice) - 10));
       setMinPrice(validMin.toString());
-      updatePriceRangeWithDebounce(validMin, priceRange[1]);
     } else {
       const validMax = Math.min(5000, Math.max(numValue, Number(minPrice) + 10));
       setMaxPrice(validMax.toString());
-      updatePriceRangeWithDebounce(priceRange[0], validMax);
-    }
-  };
-
-  const handlePriceInputBlur = (type: "min" | "max") => {
-    if (type === "min" && minPrice === "") {
-      setMinPrice("0");
-      updatePriceRangeWithDebounce(0, priceRange[1]);
-    } else if (type === "max" && maxPrice === "") {
-      setMaxPrice("5000");
-      updatePriceRangeWithDebounce(priceRange[0], 5000);
     }
   };
 
   const handleSliderChange = (value: number[]) => {
     if (value.length === 2) {
-      setIsPriceFilterActive(true);
+      setIsDragging(true);
       setPriceRange(value);
       setMinPrice(value[0].toString());
       setMaxPrice(value[1].toString());
+    }
+  };
+
+  const handleSliderChangeEnd = () => {
+    setIsDragging(false);
+    setIsPriceFilterActive(true);
+  };
+
+  // Effect to handle debounced price changes
+  useEffect(() => {
+    if (!isDragging && debouncedMinPrice !== "" && debouncedMaxPrice !== "") {
+      const min = Number(debouncedMinPrice);
+      const max = Number(debouncedMaxPrice);
+      if (!isNaN(min) && !isNaN(max)) {
+        setPriceRange([min, max]);
+      }
+    }
+  }, [debouncedMinPrice, debouncedMaxPrice, isDragging]);
+
+  // Effect to handle debounced slider changes
+  useEffect(() => {
+    if (!isDragging) {
+      setIsPriceFilterActive(true);
+    }
+  }, [debouncedPriceRange, isDragging]);
+
+  const handlePriceInputBlur = (type: "min" | "max") => {
+    if (type === "min" && minPrice === "") {
+      setMinPrice("0");
+    } else if (type === "max" && maxPrice === "") {
+      setMaxPrice("5000");
     }
   };
 
@@ -344,14 +359,14 @@ export default function ShopPage() {
       const passesPrice =
         !isPriceFilterActive || (product.price >= priceRange[0] && product.price <= priceRange[1]);
       const passesSearch =
-        !searchQuery ||
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (product.description && product.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (product.categoryNames && product.categoryNames.some((name) => name.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-        (product.subcategoryNames && product.subcategoryNames.some((name) => name.toLowerCase().includes(searchQuery.toLowerCase())));
+        !debouncedSearchQuery ||
+        product.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        (product.description && product.description.toLowerCase().includes(debouncedSearchQuery.toLowerCase())) ||
+        (product.categoryNames && product.categoryNames.some((name) => name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()))) ||
+        (product.subcategoryNames && product.subcategoryNames.some((name) => name.toLowerCase().includes(debouncedSearchQuery.toLowerCase())));
       return passesCategory && passesSubcategory && passesStock && passesPrice && passesSearch;
     });
-  }, [products, selectedCategories, selectedSubcategories, showInStockOnly, priceRange, searchQuery, isPriceFilterActive]);
+  }, [products, selectedCategories, selectedSubcategories, showInStockOnly, priceRange, debouncedSearchQuery, isPriceFilterActive]);
 
   const sortedProducts = useMemo(() => {
     const sorted = [...filteredProducts];
@@ -451,7 +466,7 @@ export default function ShopPage() {
               className="group flex items-center space-x-3 p-3 rounded-xl hover:bg-[#F5F5DC]/5 transition-all duration-300 cursor-pointer border border-transparent hover:border-[#600000]/20"
             >
               <Checkbox
-                className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-[#D4AF37] data-[state=checked]:to-[#600000] border-gray-400 data-[state=checked]:border-[#D4AF37]"
+                className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-[#D4AF37] data-[state=checked]:to-[#600000] border-gray-400 data-[state=checked]:border-[#D4AF37] cursor-pointer"
                 id={`category-${category.id}`}
                 checked={selectedCategories.includes(category.id)}
                 onCheckedChange={(checked) => handleCategoryChange(category.id, checked === true)}
@@ -490,7 +505,7 @@ export default function ShopPage() {
                     id={`subcategory-${subcategory.id}`}
                     checked={selectedSubcategories.includes(subcategory.id)}
                     onCheckedChange={(checked) => handleSubcategoryChange(subcategory.id, checked === true)}
-                    className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-[#8B1A1A] data-[state=checked]:to-[#600000] border-gray-400"
+                    className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-[#8B1A1A] data-[state=checked]:to-[#600000] border-gray-400 cursor-pointer"
                   />
                   <Label
                     htmlFor={`subcategory-${subcategory.id}`}
@@ -523,7 +538,8 @@ export default function ShopPage() {
               step={10}
               value={priceRange}
               onValueChange={handleSliderChange}
-              className="w-full"
+              onValueCommit={handleSliderChangeEnd}
+              className="w-full cursor-pointer"
             />
             <div className="flex items-center justify-between text-sm text-gray-400">
               <div>${priceRange[0]}</div>
@@ -542,7 +558,7 @@ export default function ShopPage() {
                 value={minPrice}
                 onChange={(e) => handlePriceInputChange("min", e.target.value)}
                 onBlur={() => handlePriceInputBlur("min")}
-                className="bg-white/10 border-gray-600 text-white placeholder-gray-400 focus:border-green-400"
+                className="bg-white/10 border-gray-600 text-white placeholder-gray-400 focus:border-green-400 cursor-text"
               />
             </div>
             <div className="space-y-2">
@@ -556,7 +572,7 @@ export default function ShopPage() {
                 value={maxPrice}
                 onChange={(e) => handlePriceInputChange("max", e.target.value)}
                 onBlur={() => handlePriceInputBlur("max")}
-                className="bg-white/10 border-gray-600 text-white placeholder-gray-400 focus:border-green-400"
+                className="bg-white/10 border-gray-600 text-white placeholder-gray-400 focus:border-green-400 cursor-text"
               />
             </div>
           </div>
@@ -577,7 +593,7 @@ export default function ShopPage() {
               id="in-stock"
               checked={showInStockOnly}
               onCheckedChange={(checked) => handleInStockChange(checked === true)}
-              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-yellow-500 data-[state=checked]:to-orange-500 border-gray-400"
+              className="data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-yellow-500 data-[state=checked]:to-orange-500 border-gray-400 cursor-pointer"
             />
             <Label htmlFor="in-stock" className="text-gray-300 cursor-pointer">
               {shopTexts.inStock}
@@ -842,7 +858,7 @@ export default function ShopPage() {
                   <p className="ml-4 text-gray-400 text-lg">Loading products...</p>
                 </div>
               ) : sortedProducts.length > 0 ? (
-                <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-8 auto-rows-fr' : 'space-y-6'}`}>
+                <div className={`${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8 auto-rows-fr' : 'space-y-6'}`}>
                   {sortedProducts.map((product) => (
                     <ProductCard
                       key={product.id}

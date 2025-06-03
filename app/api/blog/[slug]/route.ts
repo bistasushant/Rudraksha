@@ -6,21 +6,6 @@ import { ApiResponse, IBlog } from "@/types";
 import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 
-// Type for lean Blog document
-interface LeanBlog {
-  _id: string;
-  name: string;
-  slug: string;
-  heading: string;
-  category: mongoose.Types.ObjectId[];
-  description: string;
-  seoTitle: string;
-  metaDescription: string;
-  metaKeywords: string;
-  image?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
 
 export async function PATCH(req: NextRequest) {
   await connectDB();
@@ -191,68 +176,99 @@ export async function DELETE(req: NextRequest) {
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
   await connectDB();
-  const { user, response } = await hasAuth(req);
-  if (!user || response) {
-    return (
-      response ||
-      NextResponse.json(
-        { error: true, message: "Unauthorized" } as ApiResponse,
-        { status: 401 }
-      )
-    );
-  }
 
   try {
-    const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get("page") || "1", 10);
-    const limit = parseInt(searchParams.get("limit") || "10", 10);
-    const skip = (page - 1) * limit;
+    const { slug } = await params;
 
-    const total = await Blog.countDocuments();
-    const blogs = await Blog.find({})
-      .lean<LeanBlog[]>()
-      .skip(skip)
-      .limit(limit);
-    const sanitizedBlog = blogs.map((blog) => ({
-      id: blog._id.toString(),
-      name: blog.name,
-      slug: blog.slug,
-      heading: blog.heading,
-      category: blog.category.map((cat) => cat.toString()),
-      description: blog.description,
-      seoTitle: blog.seoTitle || "",
-      metaDescription: blog.metaDescription || "",
-      metaKeywords: blog.metaKeywords || "",
-      image: blog.image || "",
-      createdAt: blog.createdAt,
-      updatedAt: blog.updatedAt,
-    }));
+    if (!slug) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog slug is required",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
 
-    const responseData: ApiResponse<{
-      blogs: IBlog[];
-      total: number;
-      page: number;
-      totalPages: number;
-    }> = {
+    if (typeof slug !== "string") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog slug must be a string",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (slug.length > 100) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog slug too long (max 100 characters)",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    const foundBlog = await Blog.findOne({ slug })
+      .select("name slug heading category description seoTitle metaDescription metaKeywords image createdAt updatedAt")
+      .populate('category', 'name slug')
+      .lean<IBlog | null>();
+
+    if (!foundBlog) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Blog not found",
+        } as ApiResponse,
+        { status: 404 }
+      );
+    }
+
+    const responseData: ApiResponse<IBlog> = {
       error: false,
-      message: "Blogs retrieved successfully",
-      data: {
-        blogs: sanitizedBlog,
-        total,
-        page,
-        totalPages: Math.ceil(total / limit),
-      },
+      message: "Blog retrieved successfully",
+      data: foundBlog,
     };
-    return NextResponse.json(responseData, { status: 200 });
+
+    return NextResponse.json(responseData, {
+      status: 200,
+      headers: {
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=59",
+      },
+    });
   } catch (error) {
-    console.error("Get Blogs Error:", error);
+    console.error("Get Blog Error:", error);
+
+    if (error instanceof mongoose.Error.CastError) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Invalid blog format",
+        } as ApiResponse,
+        { status: 400 }
+      );
+    }
+
+    if (error instanceof mongoose.Error) {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Database error occurred",
+        } as ApiResponse,
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json(
       {
         error: true,
         message: "Internal server error",
-        details: error instanceof Error ? error.message : "Unknown error",
       } as ApiResponse,
       { status: 500 }
     );

@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { IBlog, IBlogcategory } from "@/types";
 import Image from "next/image";
 import RichTextEditor from "@/components/admin/RichTextEditor";
+import { useDebounce } from "@/hooks/useDebounce";
 
 interface FormValues {
   productName: string;
@@ -34,23 +35,6 @@ interface FormData {
   slug: string;
   image: string;
 }
-
-// Reusable debounce hook
-const useDebounce = (value: string, delay: number): string => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-};
 
 const EditBlogForm: React.FC = () => {
   const router = useRouter();
@@ -131,7 +115,7 @@ const EditBlogForm: React.FC = () => {
         setLoadingCategories(true);
 
         // Fetch blog data
-        const blogResponse = await fetch(`/api/blog?page=1&limit=100`, {
+        const blogResponse = await fetch(`/api/blog/${routeId}`, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -146,13 +130,7 @@ const EditBlogForm: React.FC = () => {
         }
 
         const blogResult = await blogResponse.json();
-        const blogs = Array.isArray(blogResult.data?.blogs)
-          ? blogResult.data.blogs
-          : [];
-
-        const blogData = blogs.find(
-          (p: IBlog) => p.id === routeId || p.slug === routeId
-        );
+        const blogData = blogResult.data;
 
         if (!blogData || typeof blogData !== "object") {
           throw new Error("Blog data not found or invalid in response");
@@ -163,7 +141,7 @@ const EditBlogForm: React.FC = () => {
 
         // Update formData with blog data
         setFormData({
-          id: blogData.id || "",
+          id: blogData._id || "",
           name: blogData.name || "",
           heading: blogData.heading || "",
           description: blogData.description || "",
@@ -174,23 +152,19 @@ const EditBlogForm: React.FC = () => {
           image: blogData.image || "",
         });
 
-        // IMPORTANT FIX: Also update formValues with the SEO content
-        // setFormValues({
-        //   productName: blogData.name || "",
-        //   price: "",
-        //   stockQuantity: "",
-        //   description: blogData.description || "",
-        //   benefit: "",
-        //   seoTitle: blogData.seoTitle || "",
-        //   metaDescription: blogData.metaDescription || "",
-        //   metaKeywords: blogData.metaKeywords || "",
-        // });
-
         // Set initial categories
         if (Array.isArray(blogData.category)) {
-          setSelectedCategories(blogData.category);
+          // If category is an array of objects, extract IDs
+          const categoryIds = blogData.category.map((cat: { _id?: string; id?: string } | string) =>
+            typeof cat === 'object' ? (cat._id || cat.id) : cat
+          );
+          setSelectedCategories(categoryIds);
         } else if (blogData.category) {
-          setSelectedCategories([blogData.category]);
+          // If category is a single object, extract its ID
+          const categoryId = typeof blogData.category === 'object'
+            ? (blogData.category._id || blogData.category.id)
+            : blogData.category;
+          setSelectedCategories([categoryId]);
         }
 
         // Fetch blog categories
@@ -202,12 +176,11 @@ const EditBlogForm: React.FC = () => {
 
         if (!categoriesResponse.ok) {
           const errorData = await categoriesResponse.json();
-          throw new Error(
-            errorData.message || "Failed to fetch blog categories"
-          );
+          throw new Error(errorData.message || "Failed to fetch blog categories");
         }
 
         const categoriesResult = await categoriesResponse.json();
+        console.log("Categories Response:", categoriesResult);
         setCategories(categoriesResult.data?.blogCategories || []);
 
         // Validate initial form data
@@ -520,11 +493,10 @@ const EditBlogForm: React.FC = () => {
                     <div className="relative group w-full max-w-md mx-auto">
                       <label
                         htmlFor="image-upload"
-                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${
-                          formErrors.image
-                            ? "border-red-500"
-                            : "border-white/30"
-                        }`}
+                        className={`flex flex-col items-center justify-center h-48 border-2 border-dashed rounded-lg cursor-pointer hover:border-purple-500 transition-colors ${formErrors.image
+                          ? "border-red-500"
+                          : "border-white/30"
+                          }`}
                       >
                         {formData.image ? (
                           <div className="relative w-full h-full p-2">
@@ -578,9 +550,8 @@ const EditBlogForm: React.FC = () => {
                       <Label className="text-white/80">Blog Name *</Label>
                       <Input
                         name="blogName"
-                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                          formErrors.name ? "border-red-500" : "border-white/20"
-                        }`}
+                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.name ? "border-red-500" : "border-white/20"
+                          }`}
                         placeholder="Enter blog name"
                         value={formData.name}
                         onChange={handleInputChange}
@@ -598,11 +569,10 @@ const EditBlogForm: React.FC = () => {
                       <Label className="text-white/80">Blog Heading *</Label>
                       <Input
                         name="blogHeading"
-                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                          formErrors.heading
-                            ? "border-red-500"
-                            : "border-white/20"
-                        }`}
+                        className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.heading
+                          ? "border-red-500"
+                          : "border-white/20"
+                          }`}
                         placeholder="Enter Blog Heading"
                         value={formData.heading}
                         onChange={handleInputChange}
@@ -621,37 +591,38 @@ const EditBlogForm: React.FC = () => {
                       <div className="relative">
                         <button
                           type="button"
-                          className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white ${
-                            formErrors.selectedCategories
-                              ? "border-red-500"
-                              : "border-white/20"
-                          } focus:ring-2 focus:ring-gray-500`}
+                          className={`flex items-center justify-between w-full bg-white/5 rounded-lg px-4 py-2 text-white ${formErrors.selectedCategories
+                            ? "border-red-500"
+                            : "border-white/20"
+                            } focus:ring-2 focus:ring-gray-500`}
                           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                           disabled={isSubmitting}
                         >
                           <div className="flex flex-wrap gap-2">
                             {selectedCategories.length > 0 ? (
-                              selectedCategories.map((categoryId) => (
-                                <span
-                                  key={categoryId}
-                                  className="bg-purple-600 text-white text-sm px-2 py-1 rounded flex items-center"
-                                >
-                                  {
-                                    categories.find(
-                                      (cat) => cat.id === categoryId
-                                    )?.name
-                                  }
+                              selectedCategories.map((categoryId: string) => {
+                                const category = categories.find(
+                                  (cat: IBlogcategory) => cat.id === categoryId
+                                );
+                                if (!category) return null;
+                                return (
                                   <span
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleCategoryToggle(categoryId);
-                                    }}
-                                    className="ml-1 text-white/80 hover:text-white cursor-pointer"
+                                    key={category.id}
+                                    className="bg-purple-600 text-white text-sm px-2 py-1 rounded flex items-center"
                                   >
-                                    <X className="h-4 w-4" />
+                                    {category.name}
+                                    <span
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleCategoryToggle(categoryId);
+                                      }}
+                                      className="ml-1 text-white/80 hover:text-white cursor-pointer"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </span>
                                   </span>
-                                </span>
-                              ))
+                                );
+                              })
                             ) : (
                               <span className="text-white/50">
                                 Select blog categories
@@ -659,9 +630,8 @@ const EditBlogForm: React.FC = () => {
                             )}
                           </div>
                           <ChevronDown
-                            className={`h-5 w-5 text-white/50 transition-transform ${
-                              isDropdownOpen ? "rotate-180" : ""
-                            }`}
+                            className={`h-5 w-5 text-white/50 transition-transform ${isDropdownOpen ? "rotate-180" : ""
+                              }`}
                           />
                         </button>
                         {formErrors.selectedCategories && (
@@ -689,12 +659,11 @@ const EditBlogForm: React.FC = () => {
                               filteredCategories.map((category) => (
                                 <div
                                   key={category.id}
-                                  className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${
-                                    category.id &&
+                                  className={`px-4 py-2 cursor-pointer hover:bg-white text-white hover:text-gray-900/90 flex items-center justify-between ${category.id &&
                                     selectedCategories.includes(category.id)
-                                      ? "bg-purple-600/70"
-                                      : ""
-                                  }`}
+                                    ? "bg-purple-600/70"
+                                    : ""
+                                    }`}
                                   onClick={() =>
                                     category.id &&
                                     handleCategoryToggle(category.id)
@@ -741,11 +710,10 @@ const EditBlogForm: React.FC = () => {
                     <Label className="text-white/80">SEO Title</Label>
                     <Input
                       name="seoTitle"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.seoTitle
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.seoTitle
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter SEO title (max 60 characters)"
                       value={formValues.seoTitle}
                       onChange={handleInputChange}
@@ -766,11 +734,10 @@ const EditBlogForm: React.FC = () => {
                     <Label className="text-white/80">Meta Description</Label>
                     <Textarea
                       name="metaDescription"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${
-                        formErrors.metaDescription
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white h-24 w-full ${formErrors.metaDescription
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta description (max 160 characters)"
                       value={formValues.metaDescription}
                       onChange={handleInputChange}
@@ -791,11 +758,10 @@ const EditBlogForm: React.FC = () => {
                     <Label className="text-white/80">Meta Keywords</Label>
                     <Input
                       name="metaKeywords"
-                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${
-                        formErrors.metaKeywords
-                          ? "border-red-500"
-                          : "border-white/20"
-                      }`}
+                      className={`bg-white/5 border focus:ring-2 focus:ring-purple-500 text-white w-full ${formErrors.metaKeywords
+                        ? "border-red-500"
+                        : "border-white/20"
+                        }`}
                       placeholder="Enter meta keywords (comma-separated, max 10)"
                       value={formValues.metaKeywords}
                       onChange={handleInputChange}

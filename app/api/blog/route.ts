@@ -161,16 +161,37 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, parseInt(searchParams.get("limit") || "10", 10));
+    const query = searchParams.get("query") || "";
+    const category = searchParams.get("category");
     const skip = (page - 1) * limit;
 
-    // Fetch total count of blogs
-    const total = await Blog.countDocuments();
+    // Build query conditions
+    const conditions: {
+      $or?: Array<{
+        heading?: { $regex: string; $options: string };
+        description?: { $regex: string; $options: string };
+      }>;
+      category?: mongoose.Types.ObjectId;
+    } = {};
+    if (query) {
+      conditions.$or = [
+        { heading: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } }
+      ];
+    }
+    if (category) {
+      conditions.category = new mongoose.Types.ObjectId(category);
+    }
 
-    // Fetch blogs with pagination
-    const blogs = await Blog.find({})
+    // Fetch total count of blogs with conditions
+    const total = await Blog.countDocuments(conditions);
+
+    // Fetch blogs with pagination and conditions
+    const blogs = await Blog.find(conditions)
       .lean<LeanBlog[]>()
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .sort({ createdAt: -1 });
 
     // Sanitize and transform blog data
     const sanitizedBlog = blogs.map((blog) => {
@@ -229,10 +250,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(responseData, {
       status: 200,
       headers: {
-        "Access-Control-Allow-Origin":
-          process.env.NODE_ENV === "development"
-            ? "http://localhost:3000"
-            : "*",
+        "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST",
         "Access-Control-Allow-Headers": "Content-Type, Authorization",
       },
