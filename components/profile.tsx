@@ -63,44 +63,48 @@ export default function Profile() {
   // Fetch user profile on mount
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!isAuthenticated || !token) {
-        toast.error("Please log in to view your profile");
-        setIsFetching(false);
-        return;
+      const storedToken = localStorage.getItem('token')
+      const storedRole = localStorage.getItem('role')
+      
+      if (!storedToken || !storedRole) {
+        toast.error("Please log in to view your profile")
+        setIsFetching(false)
+        return
       }
 
-      setIsFetching(true);
+      setIsFetching(true)
       try {
         const response = await fetch("/api/customer/profile", {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${storedToken}`,
           },
-        });
-        const data = await response.json();
+        })
+        const data = await response.json()
         if (!data.error && data.data) {
-          const profileData = data.data;
-          setUser(profileData);
+          const profileData = data.data
+          setUser(profileData)
           setFormData({
             name: profileData.name || "",
             email: profileData.email || "",
             contactNumber: profileData.contactNumber || "",
             image: profileData.image || "",
-          });
+          })
         } else {
-          toast.error(data.message || "Failed to fetch profile");
-          setFormData({ name: "", email: "", contactNumber: "", image: "" });
+          toast.error(data.message || "Failed to fetch profile")
+          // Don't clear form data on error
         }
-      } catch {
-        toast.error("Failed to fetch profile");
-        setFormData({ name: "", email: "", contactNumber: "", image: "" });
+      } catch (error) {
+        console.error("Error fetching profile:", error)
+        toast.error("Failed to fetch profile")
+        // Don't clear form data on error
       } finally {
-        setIsFetching(false);
+        setIsFetching(false)
       }
-    };
-    fetchProfile();
-  }, [isAuthenticated, token]);
+    }
+    fetchProfile()
+  }, []) // Remove isAuthenticated and token dependencies
 
   // Handle input changes with validation
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,12 +323,21 @@ export default function Profile() {
     );
   }
 
-  if (!isAuthenticated || !token || !user) {
+  // Show empty state if no user data
+  if (!user) {
     return (
-      <div className="container mx-auto px-4 py-8 text-center">
-        <p className="text-red-600 font-semibold">
-          Please log in to view your profile.
-        </p>
+      <div className="min-h-screen md:mt-16">
+        <div className="container mx-auto max-w-4xl">
+          <div className="relative mb-8 overflow-hidden rounded-3xl bg-[#600000]/20 backdrop-blur-xl border border-white/30 shadow-2xl">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#8B1A1A]/20 via-[#D4AF37]/20 to-[#B87333]/20"></div>
+            <div className="relative p-8 text-center">
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-[#B87333] via-[#D4AF37] to-[#8B1A1A] bg-clip-text text-transparent mb-2">
+                Profile
+              </h1>
+              <p className="text-ivoryWhite text-lg">Please log in to view your profile</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

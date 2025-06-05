@@ -38,6 +38,7 @@ const EditProductForm = () => {
     metaDescription: "",
     metaKeywords: "",
     slug: "",
+    feature: false,
   });
   const [formErrors, setFormErrors] = useState({
     name: "",
@@ -52,6 +53,7 @@ const EditProductForm = () => {
     metaKeywords: "",
     images: "",
     general: "",
+    feature: "",
   });
 
   // State for selections and UI
@@ -200,6 +202,7 @@ const EditProductForm = () => {
           metaDescription: productData.metaDescription || "",
           metaKeywords: productData.metaKeywords || "",
           slug: productData.slug || "",
+          feature: Boolean(productData.feature),
         });
         setOriginalSlug(productData.slug || "");
         setSelectedImages(productData.images || []);
@@ -368,7 +371,7 @@ const EditProductForm = () => {
   }, [selectedCategories, subcategories, loading]);
 
   // Form validation
-  const validateField = (name: string, value: string | string[]) => {
+  const validateField = (name: string, value: string | string[] | boolean) => {
     let error = "";
     switch (name) {
       case "name":
@@ -434,6 +437,11 @@ const EditProductForm = () => {
         if (Array.isArray(value) && value.length === 0)
           error = "At least one image is required.";
         break;
+      case "feature":
+        if (typeof value !== "boolean") {
+          error = "Feature must be a boolean value.";
+        }
+        break;
       default:
         break;
     }
@@ -456,6 +464,7 @@ const EditProductForm = () => {
       ),
       metaKeywords: validateField("metaKeywords", formValues.metaKeywords),
       images: validateField("images", selectedImages),
+      feature: validateField("feature", formValues.feature),
       general: "",
     };
     setFormErrors(errors);
@@ -589,6 +598,7 @@ const EditProductForm = () => {
         stock: parseInt(formValues.stock, 10),
         description: formValues.description.trim(),
         benefit: formValues.benefit.trim(),
+        feature: Boolean(formValues.feature),
         seoTitle: formValues.seoTitle.trim(),
         metaDescription: formValues.metaDescription.trim(),
         metaKeywords: formValues.metaKeywords.trim(),
@@ -596,6 +606,9 @@ const EditProductForm = () => {
         ...(formValues.slug &&
           formValues.slug !== originalSlug && { slug: formValues.slug }),
       };
+
+      // Log the update data for debugging
+      console.log("Updating product with data:", JSON.stringify(updateData, null, 2));
 
       const updateEndpoint = originalSlug
         ? `/api/products/${originalSlug}`
@@ -1031,6 +1044,33 @@ const EditProductForm = () => {
                     />
                     {formErrors.stock && (
                       <p className="text-red-500 text-sm">{formErrors.stock}</p>
+                    )}
+                  </div>
+
+                  {/* Feature Product Checkbox */}
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="feature"
+                        name="feature"
+                        checked={formValues.feature}
+                        onChange={(e) => {
+                          setFormValues(prev => ({
+                            ...prev,
+                            feature: e.target.checked
+                          }));
+                          const error = validateField("feature", e.target.checked);
+                          setFormErrors(prev => ({ ...prev, feature: error }));
+                        }}
+                        className="h-4 w-4 rounded border-white/20 bg-white/5 text-purple-600 focus:ring-purple-500"
+                      />
+                      <Label htmlFor="feature" className="text-white/80">
+                        Mark as Feature Product
+                      </Label>
+                    </div>
+                    {formErrors.feature && (
+                      <p className="text-red-500 text-sm">{formErrors.feature}</p>
                     )}
                   </div>
 

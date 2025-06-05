@@ -407,7 +407,7 @@ export default function CategoryDetail() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12">
             <div>
               <h3 className="text-4xl md:text-5xl font-black bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent mb-4">
-                Featured Products
+                {category.name} Products
               </h3>
               <p className="text-gray-300 text-lg">Discover amazing products in this category</p>
             </div>

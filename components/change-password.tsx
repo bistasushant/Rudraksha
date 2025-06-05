@@ -1,3 +1,4 @@
+"use client"
 import React, { useState } from 'react';
 import {
   Eye,
@@ -14,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const BeautifulPasswordChange = () => {
+const ChangePassword = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -407,4 +408,4 @@ const BeautifulPasswordChange = () => {
   );
 };
 
-export default BeautifulPasswordChange;
+export default ChangePassword;

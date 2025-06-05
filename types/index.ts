@@ -96,6 +96,7 @@ export interface IProduct {
   stock: number;
   description: string;
   benefit: string;
+  feature: boolean;
   images?: string[];
   seoTitle?: string;
   metaDescription?: string;
@@ -113,6 +114,7 @@ export interface AddProductRequest {
   stock: number;
   description: string;
   benefit: string;
+  feature: boolean;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -128,6 +130,7 @@ export interface UpdateProductRequest {
   stock?: number;
   description?: string;
   benefit?: string;
+  feature?: boolean;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -140,7 +143,7 @@ export interface ICategory {
   name: string;
   slug: string;
   description?: string;
-  benefit?: string
+  benefit?: string;
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
@@ -323,8 +326,12 @@ export interface UpdateSettingsRequest {
   logo?: { url: string };
   currency?: { currency: string };
   title?: { title: string };
-  hero?: { title: string; subtitle: string; videoUrl: string; images?: string[] };
-
+  hero?: {
+    title: string;
+    subtitle: string;
+    videoUrl: string;
+    images?: string[];
+  };
 }
 
 export interface SettingsResponseData {
@@ -333,7 +340,6 @@ export interface SettingsResponseData {
   currency?: ICurrency;
   title?: ITitle;
   hero?: IHero;
-
 }
 
 export interface IContact {
@@ -460,13 +466,13 @@ export interface ICheckout extends Document {
   totalAmount: number;
   itemsCount: number;
   status:
-  | "pending"
-  | "confirm"
-  | "processing"
-  | "pickup"
-  | "on the way"
-  | "completed"
-  | "cancelled";
+    | "pending"
+    | "confirm"
+    | "processing"
+    | "pickup"
+    | "on the way"
+    | "completed"
+    | "cancelled";
   paymentStatus: "paid" | "unpaid";
   paymentMethod?: string;
   createdAt?: Date;
@@ -581,7 +587,6 @@ export interface UpdateTestimonialRequest {
   seoTitle?: string;
   metaDescription?: string;
   metaKeywords?: string;
-  isActive?: boolean;
 }
 
 export interface IWishlistItem {
@@ -605,6 +610,108 @@ export interface IWishlistItem extends Document {
   createdAt?: Date;
 }
 
+export interface IFaq {
+  _id?: string;
+  id: string;
+  type: "faq" | "image";
+  slug: string;
+  question: string;
+  answer: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  image?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
 
+export interface AddFaqRequest {
+  question: string;
+  slug: string;
+  answer: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+}
 
+export interface UpdateFaqRequest {
+  question?: string;
+  slug?: string;
+  answer?: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+}
 
+export interface AddImageRequest {
+  image: string;
+}
+
+export interface IBenefit {
+  _id?: string;
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface AddBenefitRequest {
+  title: string;
+  slug: string;
+  description: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+}
+
+export interface UpdateBenefitRequest {
+  title?: string;
+  slug?: string;
+  description?: string;
+  seoTitle?: string;
+  metaDescription?: string;
+  metaKeywords?: string;
+}
+
+export interface IContent extends Document {
+  type: "banner" | "package";
+  title: string;
+  description: string;
+  image?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+export interface AddBannerRequest {
+  type: "banner";
+  title: string;
+  description: string;
+  image?: string; 
+}
+
+export interface AddPackageRequest {
+  type: "package";
+  title: string;
+  description: string;
+  image?: string;
+}
+
+export interface IDesign extends Document {
+  productId: Types.ObjectId;
+  title: string;
+  image: string;
+  price: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface AddDesignRequest {
+  productId: string;
+  title: string;
+  image: string;
+  price: number;
+}

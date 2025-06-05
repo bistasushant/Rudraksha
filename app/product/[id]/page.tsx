@@ -419,7 +419,7 @@ export default function ProductDetailPage({
                   <div className="w-1 h-6 bg-brassGold rounded-full"></div>
                   Description
                 </h2>
-                <div className="product-description leading-relaxed backdrop-blur-sm bg-gradient-to-br from-white/5 to-white/[0.02] p-8 rounded-2xl border border-white/10 text-justify shadow-lg shadow-[#B87333]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[#B87333]/30 hover:border-white/20 [&_*]:text-ivoryWhite [&_u]:underline [&_u]:decoration-2 [&_u]:decoration-brassGold">
+                <div className="product-description leading-relaxed text-white backdrop-blur-sm bg-gradient-to-br from-white/5 to-white/[0.02] p-8 rounded-2xl border border-white/10 text-justify shadow-lg shadow-[#B87333]/20 transition-all duration-300 hover:shadow-xl hover:shadow-[#B87333]/30 hover:border-white/20 [&_*]:text-ivoryWhite [&_u]:underline [&_u]:decoration-2 [&_u]:decoration-brassGold">
                   {product.description ? (
                     renderHTMLContent(product.description)
                   ) : (

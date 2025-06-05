@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useState } from "react"
 import { Search, ShoppingCart, Trash2, Heart, Sparkles } from "lucide-react"
 import { FaHeart } from "react-icons/fa"
@@ -10,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner"
 import { useWishlist, WishlistItem } from "@/context/wishlist-context"
 import { useCart } from "@/context/cart-context"
+import { useAuth } from "@/context/auth-context"
 
 export default function Wishlist() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([])
@@ -18,13 +21,76 @@ export default function Wishlist() {
   const [sortOption, setSortOption] = useState("all")
   const { addItem } = useCart()
   const { wishlist, removeFromWishlist } = useWishlist()
+  const { isAuthenticated } = useAuth()
+  const [error, setError] = useState<string | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
+  // Initialize wishlist when component mounts
   useEffect(() => {
-    setWishlistItems(wishlist)
-    setLoading(false)
-  }, [wishlist])
+    const initializeWishlist = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        // Check authentication
+        const storedToken = localStorage.getItem('token')
+        const storedRole = localStorage.getItem('role')
+        
+        if (!storedToken || !storedRole) {
+          setError("Please log in to view your wishlist")
+          return
+        }
+
+        // Wait for auth context to initialize
+        let retryCount = 0
+        while (!isAuthenticated && retryCount < 3) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+          retryCount++
+        }
+
+        // If we have a token but auth context isn't ready, use stored data
+        if (!isAuthenticated && storedToken) {
+          console.log("Using stored authentication data")
+          // Continue with stored token
+        } else if (!isAuthenticated) {
+          setError("Please log in to view your wishlist")
+          return
+        }
+
+        // Set wishlist items
+        if (Array.isArray(wishlist)) {
+          setWishlistItems(wishlist)
+          setIsInitialized(true)
+        } else {
+          console.warn("Wishlist is not an array:", wishlist)
+          setWishlistItems([])
+        }
+      } catch (error) {
+        console.error("Error initializing wishlist:", error)
+        setError("Failed to load wishlist")
+        toast.error("Failed to load wishlist")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initializeWishlist()
+  }, [wishlist, isAuthenticated])
+
+  // Update wishlist items when wishlist changes
+  useEffect(() => {
+    if (Array.isArray(wishlist) && isInitialized) {
+      setWishlistItems(wishlist)
+    }
+  }, [wishlist, isInitialized])
 
   const addToCart = async (item: WishlistItem) => {
+    const storedToken = localStorage.getItem('token')
+    if (!storedToken) {
+      toast.error("Please log in to add items to cart")
+      return
+    }
+
     try {
       await addItem({
         id: item.productId,
@@ -34,28 +100,39 @@ export default function Wishlist() {
         quantity: 1,
       })
       toast.success("Item added to cart")
-    } catch {
+    } catch (error) {
+      console.error("Error adding to cart:", error)
       toast.error("Failed to add to cart")
     }
   }
 
   const handleRemoveItem = async (productId: string) => {
+    const storedToken = localStorage.getItem('token')
+    if (!storedToken) {
+      toast.error("Please log in to manage your wishlist")
+      return
+    }
+
     try {
       await removeFromWishlist(productId)
+      toast.success("Item removed from wishlist")
     } catch (error) {
-      console.error(error)
+      console.error("Error removing item:", error)
       toast.error("Error removing item")
     }
   }
 
   // Filter and sort products
   const filteredItems = wishlistItems
-    .filter((item) => item.productName.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((item) => 
+      item.productName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.productId?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
     .sort((a, b) => {
       if (sortOption === "price-low") {
-        return a.productPrice - b.productPrice
+        return (a.productPrice || 0) - (b.productPrice || 0)
       } else if (sortOption === "price-high") {
-        return b.productPrice - a.productPrice
+        return (b.productPrice || 0) - (a.productPrice || 0)
       } else if (sortOption === "newest") {
         return new Date(b._id?.substring(0, 8) || "").getTime() -
           new Date(a._id?.substring(0, 8) || "").getTime()
@@ -78,14 +155,30 @@ export default function Wishlist() {
     )
   }
 
+  const storedToken = localStorage.getItem('token')
+  if ((!isAuthenticated && !storedToken) || error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
+        <div className="flex items-center justify-center py-32">
+          <div className="text-center space-y-4">
+            <div className="w-24 h-24 mx-auto bg-gradient-to-br from-rose-100 to-purple-100 dark:from-rose-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
+              <Heart className="w-12 h-12 text-rose-400" />
+            </div>
+            <h3 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">
+              {error || "Please log in"}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+              {error ? "There was an error loading your wishlist. Please try again." : "You need to be logged in to view and manage your wishlist."}
+            </p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-rose-200/30 to-purple-200/30 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-purple-200/30 to-blue-200/30 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
-
+  
       <div className="relative z-10 space-y-8 p-6 md:p-8 md:mt-16">
         {/* Header Section */}
         <div className="text-center space-y-4 mb-12">
@@ -137,15 +230,15 @@ export default function Wishlist() {
         {/* Wishlist Items */}
         <div className="max-w-7xl mx-auto">
           {filteredItems.length === 0 ? (
-            <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-800/80 backdrop-blur-lg">
+            <Card className="border-0 shadow-xl bg-[#2A2A2A]/80 dark:bg-gray-800/80 backdrop-blur-lg">
               <CardContent className="py-20">
                 <div className="text-center space-y-6">
                   <div className="w-24 h-24 mx-auto bg-gradient-to-br from-rose-100 to-purple-100 dark:from-rose-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center">
                     <Heart className="w-12 h-12 text-rose-400" />
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-2xl font-semibold text-gray-800 dark:text-gray-200">Your wishlist is empty</h3>
-                    <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                    <h3 className="text-2xl font-semibold text-ivoryWhite dark:text-gray-200">Your wishlist is empty</h3>
+                    <p className="text-ivoryWhite dark:text-gray-400 max-w-md mx-auto">
                       Start exploring and add items to your wishlist to see them here. Your perfect finds are just a click away!
                     </p>
                   </div>
@@ -153,9 +246,7 @@ export default function Wishlist() {
               </CardContent>
             </Card>
           ) : (
-
             <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-
               {filteredItems.map((item) => (
                 <div
                   key={item._id || item.productId}
@@ -164,7 +255,6 @@ export default function Wishlist() {
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-[#1C1C1C] via-[#2A2A2A] to-[#D4AF37] rounded-3xl blur opacity-20 group-hover:opacity-40 transition duration-500 group-hover:duration-200 animate-pulse"></div>
 
                   {/* Wishlist Heart Button */}
-
                   <button
                     onClick={(e) => {
                       e.preventDefault();
@@ -178,16 +268,13 @@ export default function Wishlist() {
 
                   {/* Product Image */}
                   <div className="relative w-full aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#2A2A2A] to-[#2A2A2A] dark:from-gray-700 dark:to-gray-800">
-
                     <div className="relative w-full h-full group-hover:scale-110 transition-transform duration-700 ease-out">
-
                       <Image
                         src={item.productImage || "/images/default-image.png"}
-                        alt={item.productName}
+                        alt={item.productName || "Product image"}
                         fill
                         className="object-cover transition-all duration-700 group-hover:scale-110"
                       />
-
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-1000 delay-200"></div>
                     </div>
                   </div>
@@ -200,7 +287,7 @@ export default function Wishlist() {
                       </h3>
                       <div className="flex items-center justify-between">
                         <p className="text-2xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
-                          Rs {item.productPrice.toLocaleString()}
+                          Rs {(item.productPrice || 0).toLocaleString()}
                         </p>
                         {item.productStock > 0 ? (
                           <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white border-0 shadow-md">
@@ -218,7 +305,7 @@ export default function Wishlist() {
                     <div className="flex gap-3 pt-2">
                       <Button
                         className="flex-1 bg-gradient-to-r from-[#8B1A1A]/70 via-[#D4AF37]/60 to-[#B87333]/80 hover:from-[#8B1A1A] hover:via-[#D4AF37] hover:to-[#B87333] text-white font-semibold py-3 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-rose-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                        disabled={item.productStock <= 0}
+                        disabled={!item.productStock || item.productStock <= 0}
                         onClick={() => addToCart(item)}
                       >
                         <ShoppingCart className="mr-2 h-4 w-4" />
@@ -238,10 +325,9 @@ export default function Wishlist() {
                 </div>
               ))}
             </div>
-
           )}
         </div>
       </div>
-    </div >
+    </div>
   )
 }

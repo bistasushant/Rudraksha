@@ -19,6 +19,7 @@ interface LeanProduct {
   stock: number;
   description: string;
   benefit: string;
+  feature: boolean;
   seoTitle: string;
   metaDescription: string;
   metaKeywords: string;
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
       stock,
       description,
       benefit,
+      feature,
       seoTitle,
       metaDescription,
       metaKeywords,
@@ -102,11 +104,9 @@ export async function POST(req: NextRequest) {
       (id: string) => new mongoose.Types.ObjectId(id)
     );
 
-    const existingSubCategories = await subCategory
-      .find({
-        _id: { $in: validSubCategories },
-      })
-      .lean();
+    const existingSubCategories = await subCategory.find({
+      _id: { $in: validSubCategories },
+    }).lean();
     if (existingSubCategories.length !== validSubCategories.length) {
       return NextResponse.json(
         {
@@ -146,19 +146,29 @@ export async function POST(req: NextRequest) {
       name: sanitizeInput(name),
       slug: productSlug,
       category: validCategories,
-      subcategory: validSubCategories, // Ensure this matches your Product model
+      subcategory: validSubCategories,
       price,
       stock,
       description: sanitizeInput(description),
       benefit: sanitizeInput(benefit),
+      feature: Boolean(feature),
       seoTitle: sanitizeInput(seoTitle || ""),
       metaDescription: sanitizeInput(metaDescription || ""),
       metaKeywords: sanitizeInput(metaKeywords || ""),
       images: processedImages,
     };
 
+    // Log the productData for debugging
+    console.log("Product Data to Save:", JSON.stringify(productData, null, 2));
+
+    // Create and save the product
     const product = new Product(productData);
     const savedProduct = await product.save();
+
+    // Log the saved product to verify
+    console.log("Saved Product:", JSON.stringify(savedProduct.toObject(), null, 2));
+
+    
 
     const productObject = savedProduct.toObject();
     delete productObject.image;
@@ -185,7 +195,6 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
 export async function GET(req: NextRequest) {
   await connectDB();
 
@@ -217,6 +226,7 @@ export async function GET(req: NextRequest) {
         stock: product.stock,
         description: product.description || "",
         benefit: product.benefit || "",
+        feature: Boolean(product.feature),
         seoTitle: product.seoTitle || "",
         metaDescription: product.metaDescription || "",
         metaKeywords: product.metaKeywords || "",

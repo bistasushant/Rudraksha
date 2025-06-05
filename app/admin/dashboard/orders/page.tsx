@@ -29,17 +29,7 @@ import { useAuth } from "@/app/admin/providers/AuthProviders";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiResponse } from "@/types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useDebounce } from "@/hooks/useDebounce";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Order {
   id: string;
@@ -83,6 +73,33 @@ interface Customer {
   role?: string;
 }
 
+interface Admin {
+  id?: string;
+  _id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  contactNumber?: string;
+  image?: string | null;
+  role: string;
+}
+
+const useDebounce = (value: string, delay: number): string => {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+};
+
 const OrdersPage = () => {
   const [orderSearchTerm, setOrderSearchTerm] = useState("");
   const debouncedOrderSearchTerm = useDebounce(orderSearchTerm, 1000);
@@ -102,7 +119,17 @@ const OrdersPage = () => {
       email: string;
       phone: string;
       image?: string | null;
-      role?: string;
+      role: string;
+    };
+  }>({});
+
+  const [admins, setAdmins] = useState<{
+    [key: string]: {
+      name: string;
+      email: string;
+      phone: string;
+      image?: string | null;
+      role: string;
     };
   }>({});
 
@@ -121,6 +148,7 @@ const OrdersPage = () => {
     { label: "Cancelled", value: "cancelled" },
   ];
 
+  // Memoized fetch function
   const fetchData = useCallback(async () => {
     if (!admin || !admin.token) {
       toast.error("Please log in to view orders");
@@ -165,7 +193,7 @@ const OrdersPage = () => {
       }
 
       const orderData: ApiResponse = await orderResponse.json();
-      console.log("Order Data:", orderData);
+      console.log("Raw Order Data from /api/admin/orders:", orderData);
 
       if (orderData.error === false && orderData.data) {
         const filteredOrders = orderData.data.checkouts || [];
@@ -183,25 +211,23 @@ const OrdersPage = () => {
         setOrders(filteredOrders);
         setTotalPages(orderData.data.totalPages || 1);
 
-        const customerIds = [
-          ...new Set(filteredOrders.map((order: Order) => order.customerId)),
-        ] as string[];
-        console.log("Customer IDs:", customerIds);
+        // Separate customer and admin IDs
+        const customerIds: string[] = [];
+        const adminIds: string[] = [];
 
+        filteredOrders.forEach((order: Order) => {
+          // Check if the customerId matches any admin ID pattern or has admin role
+          if (order.customerId && order.customerId.includes('admin')) {
+            adminIds.push(order.customerId);
+          } else {
+            customerIds.push(order.customerId);
+          }
+        });
+
+        // Fetch customer data
         if (customerIds.length > 0) {
-          const customerMap: {
-            [key: string]: {
-              name: string;
-              email: string;
-              phone: string;
-              image?: string | null;
-              role?: string;
-            };
-          } = {};
-
-          // Try fetching from /api/customer first
           const customerResponse = await fetch(
-            `/api/customer?ids=${customerIds.join(",")}`,
+            `/api/users/profiles?ids=${customerIds.join(",")}`,
             {
               method: "GET",
               headers: {
@@ -211,101 +237,83 @@ const OrdersPage = () => {
             }
           );
 
-          let customerData;
-          if (customerResponse.ok) {
-            customerData = await customerResponse.json();
-            console.log("Customer Data (/api/customer):", customerData);
-          } else {
-            console.warn(
-              "Failed to fetch from /api/customer, status:",
-              customerResponse.status
-            );
-            customerData = { error: true, data: { users: [] } };
+          if (!customerResponse.ok) {
+            throw new Error(`HTTP error! Status: ${customerResponse.status}`);
           }
+
+          const customerData = await customerResponse.json();
 
           if (
             customerData.error === false &&
             Array.isArray(customerData.data.users)
           ) {
+            const customerMap: {
+              [key: string]: {
+                name: string;
+                email: string;
+                phone: string;
+                image?: string | null;
+                role: string;
+              };
+            } = {};
             customerData.data.users.forEach((customer: Customer) => {
               const customerId = customer.id || customer._id || "";
-              if (customerId) {
-                customerMap[customerId] = {
-                  name: customer.name || "Unknown",
-                  email: customer.email || "N/A",
-                  phone: customer.contactNumber || customer.phone || "N/A",
-                  image: customer.image?.replace(/^\/public/, "") || null,
-                  role: customer.role || "Unknown",
-                };
-              }
+              customerMap[customerId] = {
+                name: customer.name || "Unknown",
+                email: customer.email || "N/A",
+                phone: customer.contactNumber || customer.phone || "N/A",
+                image: customer.image?.replace(/^\/public/, "") || null,
+                role: customer.role || "customer",
+              };
             });
+            setCustomers(customerMap);
           }
+        }
 
-          // Check for missing customers and try /api/users/profiles
-          const missingCustomerIds = (customerIds as string[]).filter(
-            (id) => !customerMap[id]
-          );
-          if (missingCustomerIds.length > 0) {
-            console.warn("Missing customer data for IDs:", missingCustomerIds);
-            // toast.warning(
-            //   `Customer data missing for IDs: ${missingCustomerIds.join(", ")}`
-            // );
-
-            // Fetch missing customers from /api/users/profiles
-            const adminResponse = await fetch(
-              `/api/users/profiles?ids=${missingCustomerIds.join(",")}`,
-              {
-                method: "GET",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${admin.token}`,
-                },
-              }
-            );
-
-            if (adminResponse.ok) {
-              const adminData = await adminResponse.json();
-              console.log("Customer Data (/api/users/profiles):", adminData);
-
-              if (
-                adminData.error === false &&
-                Array.isArray(adminData.data.users)
-              ) {
-                adminData.data.users.forEach((customer: Customer) => {
-                  const customerId = customer.id || customer._id || "";
-                  if (customerId) {
-                    customerMap[customerId] = {
-                      name: customer.name || "Unknown",
-                      email: customer.email || "N/A",
-                      phone: customer.contactNumber || customer.phone || "N/A",
-                      image: customer.image?.replace(/^\/public/, "") || null,
-                      role: customer.role || "Unknown",
-                    };
-                  }
-                });
-              }
-            } else {
-              console.warn(
-                "Failed to fetch from /api/users/profiles, status:",
-                adminResponse.status
-              );
+        // Fetch admin data
+        if (adminIds.length > 0) {
+          const adminResponse = await fetch(
+            `/api/users/profiles?ids=${adminIds.join(",")}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${admin.token}`,
+              },
             }
-          }
-
-          setCustomers(customerMap);
-
-          // Final check for missing customers
-          const stillMissing = (customerIds as string[]).filter(
-            (id) => !customerMap[id]
           );
-          if (stillMissing.length > 0) {
-            console.error("Still missing customer data for IDs:", stillMissing);
-            toast.error(
-              `Unable to fetch customer data for IDs: ${stillMissing.join(", ")}`
-            );
+
+          if (!adminResponse.ok) {
+            throw new Error(`HTTP error! Status: ${adminResponse.status}`);
           }
-        } else {
-          setCustomers({});
+
+          const adminData = await adminResponse.json();
+
+          if (
+            adminData.error === false &&
+            Array.isArray(adminData.data.users)
+          ) {
+            const adminMap: {
+              [key: string]: {
+                name: string;
+                email: string;
+                phone: string;
+                image?: string | null;
+                role: string;
+              };
+            } = {};
+            adminData.data.users.forEach((admin: Admin) => {
+              const adminId = admin.id || admin._id || "";
+              adminMap[adminId] = {
+                name: admin.name || "Unknown Admin",
+                email: admin.email || "N/A",
+                phone: admin.contactNumber || admin.phone || "N/A",
+                image: admin.image?.replace(/^\/public/, "") || null,
+                role: admin.role || "admin",
+              };
+            });
+            setAdmins(adminMap);
+          }
         }
       } else {
         toast.error(orderData.message || "Failed to fetch orders");
@@ -336,7 +344,7 @@ const OrdersPage = () => {
     }
     setSelectedOrder(order);
     setIsDeleteDialogOpen(true);
-  };
+  }
 
   const handleDeleteOrder = async () => {
     if (!admin || !admin.token || !selectedOrder) {
@@ -353,16 +361,12 @@ const OrdersPage = () => {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(
-          errorData.message || `HTTP error! Status: ${response.status}`
-        );
+        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
       }
       const data: ApiResponse = await response.json();
       if (data.error === false) {
         toast.success("Order deleted successfully");
-        setOrders((prev) =>
-          prev.filter((order) => order.id !== selectedOrder.id)
-        );
+        setOrders((prev) => prev.filter((order) => order.id !== selectedOrder.id));
         setIsDeleteDialogOpen(false);
         setSelectedOrder(null);
       } else {
@@ -402,6 +406,7 @@ const OrdersPage = () => {
     }
   };
 
+  // Client-side filtering
   const filteredOrders = orders.filter(
     (order) =>
       order.id.toLowerCase().includes(debouncedOrderSearchTerm.toLowerCase()) ||
@@ -512,35 +517,38 @@ const OrdersPage = () => {
                             <Avatar className="h-8 w-8">
                               <AvatarImage
                                 src={
+                                  admins[order.customerId]?.image ||
                                   customers[order.customerId]?.image ||
                                   "/placeholder.svg"
                                 }
                                 alt="Avatar"
                               />
                               <AvatarFallback className="bg-purple-600">
-                                {(customers[order.customerId]?.name || "U")
+                                {(
+                                  admins[order.customerId]?.name ||
+                                  customers[order.customerId]?.name ||
+                                  "U"
+                                )
                                   .slice(0, 2)
                                   .toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div>
                               <span className="text-white/70 text-md">
-                                {customers[order.customerId]?.name || (
-                                  <span className="text-yellow-400">
-                                    Missing Customer (ID: {order.customerId})
-                                  </span>
+                                {admins[order.customerId]?.name ||
+                                  customers[order.customerId]?.name ||
+                                  "Unknown"}
+                                {admins[order.customerId] && (
+                                  <Badge className="ml-2 bg-purple-500/20 text-purple-400 border-0">
+                                    Admin
+                                  </Badge>
                                 )}
                               </span>
                               <p className="text-white/50 text-xs">
-                                {customers[order.customerId]?.email || (
-                                  <span className="text-yellow-400">N/A</span>
-                                )}
+                                {admins[order.customerId]?.email ||
+                                  customers[order.customerId]?.email ||
+                                  "N/A"}
                               </p>
-                              {/* {customers[order.customerId]?.role && (
-                                <p className="text-white/50 text-xs">
-                                  Role: {customers[order.customerId].role}
-                                </p>
-                              )} */}
                             </div>
                           </div>
                         </TableCell>
@@ -578,6 +586,7 @@ const OrdersPage = () => {
                               order.status.slice(1)}
                           </Badge>
                         </TableCell>
+
                         <TableCell>
                           <div className="flex">
                             <Button
@@ -595,17 +604,15 @@ const OrdersPage = () => {
                               variant="ghost"
                               size="icon"
                               className="hover:bg-gray-400/20"
-                              onClick={() =>
-                                order.id &&
-                                openDeleteDialog({
-                                  id: order.id,
-                                })
-                              }
+                              onClick={() => order.id && openDeleteDialog({
+                                id: order.id,
+                              })}
                             >
                               <span className="text-red-500">
                                 <Trash2 />
                               </span>
                             </Button>
+
                           </div>
                         </TableCell>
                       </TableRow>
@@ -618,6 +625,7 @@ const OrdersPage = () => {
                       >
                         No orders found.
                       </TableCell>
+
                     </TableRow>
                   )}
                 </TableBody>

@@ -49,6 +49,11 @@ const ProductSchema = new Schema<IProduct>(
       required: true,
       trim: true,
     },
+    feature: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     seoTitle: {
       type: String,
       trim: true,

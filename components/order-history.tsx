@@ -93,6 +93,7 @@ export default function OrderHistory() {
   const [statusFilter, setStatusFilter] = useState("all");
   const { isAuthenticated } = useAuth();
   const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const userRole = typeof window !== "undefined" ? localStorage.getItem("role") : null;
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -103,7 +104,10 @@ export default function OrderHistory() {
 
       setError(null);
       try {
-        const url = new URL("/api/customer/history", window.location.origin);
+        // Determine which endpoint to use based on role
+        const endpoint = userRole === "admin" ? "/api/admin/orders" : "/api/customer/history";
+        const url = new URL(endpoint, window.location.origin);
+        
         if (debouncedSearchQuery) url.searchParams.append("search", debouncedSearchQuery);
         if (statusFilter && statusFilter !== "all") url.searchParams.append("status", statusFilter);
 
@@ -136,7 +140,7 @@ export default function OrderHistory() {
     };
 
     fetchOrders();
-  }, [isAuthenticated, token, debouncedSearchQuery, statusFilter]);
+  }, [isAuthenticated, token, debouncedSearchQuery, statusFilter, userRole]);
 
   // Memoized filtered orders
   const filteredOrders = useMemo(() => ({
@@ -147,6 +151,28 @@ export default function OrderHistory() {
     ontheway: orders.filter((order) => order.status.toLowerCase() === "on the way"),
     delivered: orders.filter((order) => order.status.toLowerCase() === "delivered"),
   }), [orders]);
+
+  // Add a message for admin users
+  if (userRole === "admin") {
+    return (
+      <div className="h-full">
+        <div className="relative max-w-7xl mx-auto py-12 px-4 md:py-20">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-[#B87333] to-[#D4AF37] rounded-2xl shadow-xl shadow-[#D4AF37]/25 mb-6">
+              <Package className="h-10 w-10 text-ivoryWhite" />
+            </div>
+            <h1 className="text-5xl md:text-6xl font-black bg-gradient-to-r from-[#8B1A1A] via-[#B87333] to-[#F5F5DC] bg-clip-text text-transparent mb-4 tracking-tight">
+              Admin Order History
+            </h1>
+            <p className="text-xl text-ivoryWhite max-w-2xl mx-auto leading-relaxed">
+              View and manage orders placed by you (admin)
+            </p>
+          </div>
+          {/* Rest of the component remains the same */}
+        </div>
+      </div>
+    );
+  }
 
   if (error || !isAuthenticated || !token) {
     return (

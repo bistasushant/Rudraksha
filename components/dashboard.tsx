@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartItemCount, setCartItemCount] = useState(0);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const prevCartCount = useRef(0);
 
   useEffect(() => {
@@ -126,12 +127,16 @@ export default function Dashboard() {
       try {
         setIsLoading(true);
         const token = localStorage.getItem("token") || localStorage.getItem("authToken");
+        const storedRole = localStorage.getItem("role");
 
         if (!token) {
           throw new Error("No authentication token found");
         }
 
-        const response = await fetch("/api/customer/profile", {
+        // Determine which endpoint to use based on role
+        const endpoint = storedRole === "admin" ? "/api/admin/profile" : "/api/customer/profile";
+
+        const response = await fetch(endpoint, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
@@ -154,6 +159,7 @@ export default function Dashboard() {
         setUsername(userData.name || "");
         setUserEmail(userData.email || "");
         setUserImage(userData.image || null);
+        setUserRole(storedRole || userData.role || null);
 
         localStorage.setItem("username", userData.name || "");
         localStorage.setItem("email", userData.email || "");
@@ -166,9 +172,11 @@ export default function Dashboard() {
 
         const storedUsername = localStorage.getItem("username");
         const storedEmail = localStorage.getItem("email");
+        const storedRole = localStorage.getItem("role");
 
         if (storedUsername) setUsername(storedUsername);
         if (storedEmail) setUserEmail(storedEmail);
+        if (storedRole) setUserRole(storedRole);
 
         const storedImage = localStorage.getItem("userImage");
         if (storedImage) setUserImage(storedImage);
@@ -240,6 +248,11 @@ export default function Dashboard() {
             <p className="text-xs text-ivoryWhite dark:text-gray-400 truncate">
               {isLoading ? "Loading..." : error ? "Please try again" : userEmail || "No email"}
             </p>
+            {userRole && (
+              <p className="text-xs text-[#D4AF37] font-medium mt-1">
+                {userRole.charAt(0).toUpperCase() + userRole.slice(1)}
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -250,8 +263,12 @@ export default function Dashboard() {
           <NavButton icon={Home} label="Dashboard" isActive={activeTab === "dashboard"} onClick={() => handleNavigation("dashboard")} />
           <NavButton icon={History} label="Order History" isActive={activeTab === "orders"} onClick={() => handleNavigation("orders")} />
           <NavButton icon={Heart} label="Wishlist" isActive={activeTab === "wishlist"} onClick={() => handleNavigation("wishlist")} />
-          <NavButton icon={User} label="My Profile" isActive={activeTab === "profile"} onClick={() => handleNavigation("profile")} />
-          <NavButton icon={Lock} label="Change Password" isActive={activeTab === "password"} onClick={() => handleNavigation("password")} />
+          {userRole === "customer" && (
+            <>
+              <NavButton icon={User} label="My Profile" isActive={activeTab === "profile"} onClick={() => handleNavigation("profile")} />
+              <NavButton icon={Lock} label="Change Password" isActive={activeTab === "password"} onClick={() => handleNavigation("password")} />
+            </>
+          )}
         </div>
       </nav>
 

@@ -33,6 +33,7 @@ interface FormValues {
   seoTitle: string;
   metaDescription: string;
   metaKeywords: string;
+  feature: boolean;
 }
 
 interface FormErrors {
@@ -48,6 +49,7 @@ interface FormErrors {
   metaKeywords: string;
   images: string;
   general: string;
+  feature: string;
 }
 
 // Extended interface to include parentId for subcategories
@@ -98,6 +100,7 @@ const AddProductForm: React.FC = () => {
     seoTitle: "",
     metaDescription: "",
     metaKeywords: "",
+    feature: false,
   });
   const [formErrors, setFormErrors] = useState<FormErrors>({
     productName: "",
@@ -112,6 +115,7 @@ const AddProductForm: React.FC = () => {
     metaKeywords: "",
     images: "",
     general: "",
+    feature: "",
   });
 
   // Fetch currency
@@ -338,7 +342,7 @@ const AddProductForm: React.FC = () => {
 
   const validateField = (
     name: string,
-    value: string | string[] | number
+    value: string | string[] | number | boolean
   ): string => {
     let error = "";
     switch (name) {
@@ -415,6 +419,11 @@ const AddProductForm: React.FC = () => {
       case "images":
         if (Array.isArray(value) && value.length === 0) {
           error = "At least one image must be uploaded.";
+        }
+        break;
+      case "feature":
+        if (typeof value !== "boolean") {
+          error = "Feature must be a boolean.";
         }
         break;
       default:
@@ -535,6 +544,7 @@ const AddProductForm: React.FC = () => {
       seoTitle: "",
       metaDescription: "",
       metaKeywords: "",
+      feature: false,
     });
     setFormErrors({
       productName: "",
@@ -549,6 +559,7 @@ const AddProductForm: React.FC = () => {
       metaKeywords: "",
       images: "",
       general: "",
+      feature: "",
     });
     setSelectedImages([]);
     setSelectedCategories([]);
@@ -581,6 +592,7 @@ const AddProductForm: React.FC = () => {
       ),
       metaKeywords: validateField("metaKeywords", formValues.metaKeywords),
       images: validateField("images", selectedImages),
+      feature: validateField("feature", formValues.feature),
       general: "",
     };
     setFormErrors(errors);
@@ -592,25 +604,25 @@ const AddProductForm: React.FC = () => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     setIsSubmitting(true);
-
+  
     if (!admin?.token || !["admin", "editor"].includes(admin.role)) {
       toast.error("You do not have permission to add products.");
       router.push("/admin/dashboard/products");
       setIsSubmitting(false);
       return;
     }
-
+  
     if (!validateForm()) {
       toast.error("Please fix the form errors before submitting.");
       setIsSubmitting(false);
       return;
     }
-
+  
     // Convert price to NPR if entered in USD
     const priceValue = parseFloat(formValues.price);
     const priceInNPR =
       currency === "USD" ? priceValue * CONVERSION_RATE_USD_TO_NPR : priceValue;
-
+  
     const data = {
       name: formValues.productName.trim(),
       slug: generateSlug(formValues.productName.trim()),
@@ -620,12 +632,16 @@ const AddProductForm: React.FC = () => {
       stock: parseInt(formValues.stockQuantity, 10),
       description: formValues.description.trim(),
       benefit: formValues.benefit.trim(),
+      feature: Boolean(formValues.feature),
       seoTitle: formValues.seoTitle.trim() || undefined,
       metaDescription: formValues.metaDescription.trim() || undefined,
       metaKeywords: formValues.metaKeywords.trim() || undefined,
       images: selectedImages.length > 0 ? selectedImages : undefined,
     };
-
+  
+    // Enhanced debug log
+    console.log("Submitting product data:", JSON.stringify(data, null, 2));
+  
     try {
       const response = await fetch("/api/products", {
         method: "POST",
@@ -635,13 +651,13 @@ const AddProductForm: React.FC = () => {
         },
         body: JSON.stringify(data),
       });
-
+  
       const result = await response.json();
-
+  
       if (!response.ok) {
         throw new Error(result.message || "Failed to add product.");
       }
-
+  
       toast.success("Product added successfully!");
       resetForm(form);
       router.push("/admin/dashboard/products");
@@ -1075,6 +1091,29 @@ const AddProductForm: React.FC = () => {
                         {formErrors.stockQuantity}
                       </p>
                     )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="feature"
+                        name="feature"
+                        checked={formValues.feature}
+                        onChange={(e) => {
+                          setFormValues(prev => ({
+                            ...prev,
+                            feature: e.target.checked
+                          }));
+                          const error = validateField("feature", e.target.checked);
+                          setFormErrors(prev => ({ ...prev, feature: error }));
+                        }}
+                        className="h-4 w-4 rounded border-white/20 bg-white/5 text-purple-600 focus:ring-purple-500"
+                      />
+                      <Label htmlFor="feature" className="text-white/80">
+                        Mark as Feature Product
+                      </Label>
+                    </div>
                   </div>
 
                   <div className="space-y-2">

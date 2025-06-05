@@ -52,13 +52,13 @@ interface Order {
   totalAmount: number;
   itemsCount: number;
   status:
-  | "pending"
-  | "confirm"
-  | "processing"
-  | "pickup"
-  | "on the way"
-  | "delivered"
-  | "cancelled";
+    | "pending"
+    | "confirm"
+    | "processing"
+    | "pickup"
+    | "on the way"
+    | "delivered"
+    | "cancelled";
   paymentStatus?: "paid" | "unpaid";
   paymentMethod?: string | null;
   createdAt: string;
@@ -71,6 +71,7 @@ interface Customer {
   email: string;
   phone: string;
   image?: string | null;
+  role?: string;
 }
 
 // Interface for customer data from API
@@ -82,6 +83,7 @@ interface FetchedCustomer {
   phone?: string;
   contactNumber?: string;
   image?: string | null;
+  role?: string;
 }
 
 export default function OrderDetailsPage({
@@ -118,13 +120,13 @@ export default function OrderDetailsPage({
           Authorization: `Bearer ${admin?.token}`,
         },
       });
-
+  
       if (!response.ok) {
         // Return a fallback instead of throwing an error
         console.warn(`Could not fetch country name for ID: ${countryId}`);
         return "Not available";
       }
-
+  
       const data = await response.json();
       // The response has data directly in data, not in data.country
       return data?.data?.name || "Not available";
@@ -144,13 +146,13 @@ export default function OrderDetailsPage({
           Authorization: `Bearer ${admin?.token}`,
         },
       });
-
+  
       if (!response.ok) {
         // Return a fallback instead of throwing an error
         console.warn(`Could not fetch province name for ID: ${provinceId}`);
         return "Not available";
       }
-
+  
       const data = await response.json();
       // Access name directly from data response
       return data?.data?.name || "Not available";
@@ -169,13 +171,13 @@ export default function OrderDetailsPage({
           Authorization: `Bearer ${admin?.token}`,
         },
       });
-
+  
       if (!response.ok) {
         // Return a fallback instead of throwing an error
         console.warn(`Could not fetch city name for ID: ${cityId}`);
         return "Not available";
       }
-
+  
       const data = await response.json();
       // Access name directly from data response
       return data?.data?.name || "Not available";
@@ -226,7 +228,7 @@ export default function OrderDetailsPage({
           totalAmount: fetchedOrder.totalAmount || 0,
           itemsCount: fetchedOrder.itemsCount || 0,
           status: fetchedOrder.status || "pending",
-
+          
         };
         setOrder(mappedOrder);
         setOrderStatus(mappedOrder.status);
@@ -236,12 +238,12 @@ export default function OrderDetailsPage({
           const countryName = await getCountryNames(fetchedOrder.shippingDetails.countryId);
           setCountryName(countryName);
         }
-
+        
         if (fetchedOrder.shippingDetails.provinceId) {
           const provinceName = await getProvinceNames(fetchedOrder.shippingDetails.provinceId);
           setProvinceName(provinceName);
         }
-
+        
         if (fetchedOrder.shippingDetails.cityId) {
           const cityName = await getCityNames(fetchedOrder.shippingDetails.cityId);
           setCityName(cityName);
@@ -277,38 +279,39 @@ export default function OrderDetailsPage({
           throw new Error(customerData.message || "Failed to fetch customer");
         }
 
-        // Find the customer with the matching ID
-        const fetchedCustomer = customerData.data.users.find(
+        // Find the user with the matching ID
+        const fetchedUser = customerData.data.users.find(
           (user: FetchedCustomer) =>
             (user._id === fetchedOrder.customerId ||
               user.id === fetchedOrder.customerId) &&
             user.email !== undefined
         );
-        if (!fetchedCustomer) {
-          throw new Error("Customer not found for the provided ID");
+        if (!fetchedUser) {
+          throw new Error("User not found for the provided ID");
         }
 
-        const customerId =
-          fetchedCustomer._id || fetchedCustomer.id || fetchedOrder.customerId;
+        const userId =
+          fetchedUser._id || fetchedUser.id || fetchedOrder.customerId;
         if (
-          customerId !== fetchedOrder.customerId &&
-          fetchedCustomer.id !== fetchedOrder.customerId
+          userId !== fetchedOrder.customerId &&
+          fetchedUser.id !== fetchedOrder.customerId
         ) {
           console.error(
-            "Customer ID mismatch:",
-            customerId,
+            "User ID mismatch:",
+            userId,
             fetchedOrder.customerId
           );
-          throw new Error("Fetched customer does not match order customer ID");
+          throw new Error("Fetched user does not match order user ID");
         }
 
         setCustomer({
-          id: customerId,
-          name: fetchedCustomer.name || "Unknown",
-          email: fetchedCustomer.email || "N/A",
+          id: userId,
+          name: fetchedUser.name || "Unknown",
+          email: fetchedUser.email || "N/A",
           phone:
-            fetchedCustomer.contactNumber || fetchedCustomer.phone || "N/A",
-          image: fetchedCustomer.image?.replace(/^\/public/, "") || null,
+            fetchedUser.contactNumber || fetchedUser.phone || "N/A",
+          image: fetchedUser.image?.replace(/^\/public/, "") || null,
+          role: fetchedUser.role || "customer",
         });
       } catch (error) {
         console.error("Fetch Data Error:", error);
@@ -376,7 +379,7 @@ export default function OrderDetailsPage({
     }
   };
 
-
+  
 
   const handlePaymentStatusChange = async (checked: boolean) => {
     if (!admin?.token) {
@@ -465,10 +468,11 @@ export default function OrderDetailsPage({
              <p><strong>Country:</strong> ${countryName}</p>
               <p><strong>Province:</strong> ${provinceName}</p>
                <p><strong>City:</strong> ${cityName}</p>
-            <p><strong>Address:</strong> ${order.shippingDetails.address},${order.shippingDetails.postalCode
+            <p><strong>Address:</strong> ${order.shippingDetails.address},${
+      order.shippingDetails.postalCode
         ? ", " + order.shippingDetails.postalCode
         : ""
-      }</p>
+    }</p>
             <p><strong>Phone:</strong> ${order.shippingDetails.phone}</p>
           </div>
           <div class="section">
@@ -481,8 +485,8 @@ export default function OrderDetailsPage({
                 <th>Total</th>
               </tr>
               ${order.items
-        .map(
-          (item) => `
+                .map(
+                  (item) => `
                 <tr>
                   <td>${item.name}</td>
                   <td>${item.quantity}</td>
@@ -490,23 +494,25 @@ export default function OrderDetailsPage({
                   <td>Rs ${(item.price * item.quantity).toFixed(2)}</td>
                 </tr>
               `
-        )
-        .join("")}
+                )
+                .join("")}
             </table>
             <p class="total">Subtotal: Rs ${order.subtotal.toFixed(2)}</p>
             <p class="total">Delivery Charge: Rs ${order.shipping.toFixed(
-          2
-        )}</p>
+              2
+            )}</p>
             <p class="total">Grand Total: Rs ${order.totalAmount.toFixed(2)}</p>
-            <p><strong>Payment Status:</strong> ${order.paymentStatus === "paid" ? "Paid" : "Unpaid"
-      }</p>
-            <p><strong>Payment Method:</strong> ${order.paymentMethod
-        ? order.paymentMethod === "cod"
-          ? "Cash on Delivery"
-          : order.paymentMethod.charAt(0).toUpperCase() +
-          order.paymentMethod.slice(1)
-        : "N/A"
-      }</p>
+            <p><strong>Payment Status:</strong> ${
+              order.paymentStatus === "paid" ? "Paid" : "Unpaid"
+            }</p>
+            <p><strong>Payment Method:</strong> ${
+              order.paymentMethod
+                ? order.paymentMethod === "cod"
+                  ? "Cash on Delivery"
+                  : order.paymentMethod.charAt(0).toUpperCase() +
+                    order.paymentMethod.slice(1)
+                : "N/A"
+            }</p>
           </div>
         </div>
       </body>
@@ -565,7 +571,6 @@ export default function OrderDetailsPage({
       doc.setFontSize(12);
       doc.text(`Name: ${order.shippingDetails.fullName}`, 20, y);
       y += 10;
-      doc.setFontSize(12);
       doc.text(`Email: ${order.shippingDetails.email}`, 20, y);
       y += 10
       doc.setFontSize(12);
@@ -582,9 +587,10 @@ export default function OrderDetailsPage({
       y += 10
 
       doc.text(
-        `Address: ${order.shippingDetails.address}, ${order.shippingDetails.postalCode
-          ? ", " + order.shippingDetails.postalCode
-          : ""
+        `Address: ${order.shippingDetails.address}, ${
+          order.shippingDetails.postalCode
+            ? ", " + order.shippingDetails.postalCode
+            : ""
         }`,
         20,
         y
@@ -634,12 +640,13 @@ export default function OrderDetailsPage({
       );
       y += 10;
       doc.text(
-        `Payment Method: ${order.paymentMethod
-          ? order.paymentMethod === "cod"
-            ? "Cash on Delivery"
-            : order.paymentMethod.charAt(0).toUpperCase() +
-            order.paymentMethod.slice(1)
-          : "N/A"
+        `Payment Method: ${
+          order.paymentMethod
+            ? order.paymentMethod === "cod"
+              ? "Cash on Delivery"
+              : order.paymentMethod.charAt(0).toUpperCase() +
+                order.paymentMethod.slice(1)
+            : "N/A"
         }`,
         20,
         y
@@ -808,7 +815,7 @@ export default function OrderDetailsPage({
                         ? order.paymentMethod === "cod"
                           ? "Cash on Delivery"
                           : order.paymentMethod.charAt(0).toUpperCase() +
-                          order.paymentMethod.slice(1)
+                            order.paymentMethod.slice(1)
                         : "N/A"}
                     </p>
                   </div>
@@ -827,16 +834,16 @@ export default function OrderDetailsPage({
                         order.status === "pending"
                           ? "bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 border-0"
                           : order.status === "confirm"
-                            ? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border-0"
-                            : order.status === "processing"
-                              ? "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border-0"
-                              : order.status === "pickup"
-                                ? "bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 border-0"
-                                : order.status === "on the way"
-                                  ? "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border-0"
-                                  : order.status === "delivered"
-                                    ? "bg-green-500/20 text-green-400 hover:bg-green-500/20 border-0"
-                                    : "bg-red-500/20 text-red-400 hover:bg-red-500/30 border-0"
+                          ? "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 border-0"
+                          : order.status === "processing"
+                          ? "bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border-0"
+                          : order.status === "pickup"
+                          ? "bg-sky-500/20 text-sky-400 hover:bg-sky-500/30 border-0"
+                          : order.status === "on the way"
+                          ? "bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border-0"
+                          : order.status === "delivered"
+                          ? "bg-green-500/20 text-green-400 hover:bg-green-500/20 border-0"
+                          : "bg-red-500/20 text-red-400 hover:bg-red-500/30 border-0"
                       }
                     >
                       {orderStatus.charAt(0).toUpperCase() +
@@ -934,9 +941,16 @@ export default function OrderDetailsPage({
                   </Avatar>
                   <div>
                     <p className="text-sm font-medium text-white/50">Name</p>
-                    <p className="font-medium text-white/70 text-sm sm:text-base">
-                      {customer.name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-white/70 text-sm sm:text-base">
+                        {customer.name}
+                      </p>
+                      {customer.role === "admin" && (
+                        <Badge className="bg-purple-500/20 text-purple-400 border-0">
+                          Admin
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -1044,26 +1058,26 @@ export default function OrderDetailsPage({
                 </p>
               </div>
               <div className="flex flex-row justify-between items-center mb-6">
-                <p className="text-md font-medium text-white/50 mb-1">
+              <p className="text-md font-medium text-white/50 mb-1">
                   Country:
-                </p>
+              </p>
                 <p className="text-md font-medium text-white/50 mb-1">
                   {countryName}
                 </p>
-
+                
               </div>
               <div className="flex flex-row justify-between items-center mb-6">
-                <p className="text-md font-medium text-white/50 mb-1">
+              <p className="text-md font-medium text-white/50 mb-1">
                   Province:
-                </p>
+              </p>
                 <p className="text-md font-medium text-white/50 mb-1">
                   {provinceName}
                 </p>
               </div>
               <div className="flex flex-row justify-between items-center mb-6">
-                <p className="text-md font-medium text-white/50 mb-1">
+              <p className="text-md font-medium text-white/50 mb-1">
                   city:
-                </p>
+              </p>
                 <p className="text-md font-medium text-white/50 mb-1">
                   {cityName}
                 </p>

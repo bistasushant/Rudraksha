@@ -189,11 +189,14 @@ export default function OrderDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
-    // Get token from localStorage after component mounts
+    // Get token and role from localStorage after component mounts
     const storedToken = localStorage.getItem("token");
+    const storedRole = localStorage.getItem("role");
     setToken(storedToken);
+    setUserRole(storedRole);
   }, []);
 
   useEffect(() => {
@@ -246,7 +249,10 @@ export default function OrderDetail() {
 
       try {
         console.log("Fetching order details for ID:", id);
-        const response = await fetch(`/api/customer/history/${id}`, {
+        // Determine which endpoint to use based on role
+        const endpoint = userRole === "admin" ? `/api/admin/orders/${id}` : `/api/customer/history/${id}`;
+        
+        const response = await fetch(endpoint, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -285,7 +291,7 @@ export default function OrderDetail() {
     };
 
     fetchOrderDetails();
-  }, [id, token, router]);
+  }, [id, token, router, userRole]);
 
   if (loading) {
     return (

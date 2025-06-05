@@ -25,6 +25,12 @@ import {
   UpdateCityRequest,
   AddTestimonialRequest,
   UpdateTestimonialRequest,
+  AddFaqRequest,
+  UpdateFaqRequest,
+  AddBenefitRequest,
+  UpdateBenefitRequest,
+  AddBannerRequest,
+  AddPackageRequest,
 } from "@/types";
 import sanitizeHtml from "sanitize-html";
 import { isValidObjectId } from "mongoose";
@@ -124,7 +130,7 @@ export function sanitizeInput(input: string) {
         "font-style": [/^italic$/, /^normal$/],
         padding: [/^\d+(?:px|em|rem|%)$/],
         margin: [/^\d+(?:px|em|rem|%)$/],
-        "font-family": [/^['"]?[\w\s-]+['"]?$/i],
+        "font-family": [/^['"]?[a-zA-Z0-9\s\-_,]+['"]?$/i],
       },
     },
   });
@@ -203,6 +209,14 @@ export const validateChangeImageRequest = (
   );
 };
 
+export const validateImageRequest = (
+  data: unknown
+): data is { image: string } => {
+  if (!data || typeof data !== "object") return false;
+  const imageData = data as { image: string };
+  return typeof imageData.image === "string" && validateImage(imageData.image);
+};
+
 // Product management
 export const validateAddProductRequest = (
   data: unknown,
@@ -232,6 +246,8 @@ export const validateAddProductRequest = (
       typeof productData.description === "string") &&
     (productData.benefit === undefined ||
       typeof productData.benefit === "string") &&
+    (productData.feature === undefined ||
+      typeof productData.feature === "boolean") &&
     (productData.images === undefined ||
       (Array.isArray(productData.images) &&
         productData.images.every(
@@ -258,6 +274,7 @@ export const validateUpdateProductRequest = (
     productData.stock === undefined &&
     productData.description === undefined &&
     productData.benefit === undefined &&
+    productData.feature === undefined &&
     productData.images === undefined
   ) {
     return false; // At least one field must be provided
@@ -286,6 +303,8 @@ export const validateUpdateProductRequest = (
       typeof productData.description === "string") &&
     (productData.benefit === undefined ||
       typeof productData.benefit === "string") &&
+    (productData.feature === undefined ||
+      typeof productData.feature === "boolean") &&
     (productData.images === undefined ||
       (Array.isArray(productData.images) &&
         productData.images.every(
@@ -320,8 +339,8 @@ export const validateAddCategoryRequest = (
       typeof categoryData.metaKeywords === "string") &&
     (categoryData.isActive === undefined ||
       typeof categoryData.isActive === "boolean") &&
-    typeof categoryData.image === "string" && validateImage(categoryData.image)
-
+    typeof categoryData.image === "string" &&
+    validateImage(categoryData.image)
   );
 };
 
@@ -450,25 +469,24 @@ export const validateAddBlogRequest = (
   const blogData = data as Partial<AddBlogRequest>;
 
   return (
-    (typeof blogData.name === "string" &&
-      validateName(blogData.name) &&
-      (blogData.slug === undefined ||
-        (typeof blogData.slug === "string" && validateSlug(blogData.slug))) &&
-      typeof blogData.heading === "string" &&
-      blogData.heading.trim().length > 0 &&
-      Array.isArray(blogData.category) &&
-      blogData.category.every((cat) => typeof cat === "string") &&
-      typeof blogData.description === "string" &&
-      blogData.description.trim().length > 0 &&
-      typeof blogData.seoTitle === "string" &&
-      blogData.seoTitle.trim().length > 0 &&
-      typeof blogData.metaDescription === "string" &&
-      blogData.metaDescription?.trim().length > 0 &&
-      typeof blogData.metaKeywords === "string" &&
-      blogData.metaKeywords?.trim().length > 0 &&
-      (blogData.image === undefined ||
-        (typeof blogData.image === "string" && validateImage(blogData.image)))
-    )
+    typeof blogData.name === "string" &&
+    validateName(blogData.name) &&
+    (blogData.slug === undefined ||
+      (typeof blogData.slug === "string" && validateSlug(blogData.slug))) &&
+    typeof blogData.heading === "string" &&
+    blogData.heading.trim().length > 0 &&
+    Array.isArray(blogData.category) &&
+    blogData.category.every((cat) => typeof cat === "string") &&
+    typeof blogData.description === "string" &&
+    blogData.description.trim().length > 0 &&
+    typeof blogData.seoTitle === "string" &&
+    blogData.seoTitle.trim().length > 0 &&
+    typeof blogData.metaDescription === "string" &&
+    blogData.metaDescription?.trim().length > 0 &&
+    typeof blogData.metaKeywords === "string" &&
+    blogData.metaKeywords?.trim().length > 0 &&
+    (blogData.image === undefined ||
+      (typeof blogData.image === "string" && validateImage(blogData.image)))
   );
 };
 
@@ -818,27 +836,46 @@ export const validateAddTestimonialRequest = (
   role: string
 ): ValidationResult => {
   if (!validateRole(role, "editor")) {
-    return { isValid: false, message: "Forbidden: You do not have permission to add testimonials" };
+    return {
+      isValid: false,
+      message: "Forbidden: You do not have permission to add testimonials",
+    };
   }
 
   if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return { isValid: false, message: "Invalid request format: Data must be a valid object" };
+    return {
+      isValid: false,
+      message: "Invalid request format: Data must be a valid object",
+    };
   }
 
   const testimonialData = data as Partial<AddTestimonialRequest>;
 
-  if (typeof testimonialData.fullName !== "string" || testimonialData.fullName.trim().length < 3) {
-    return { isValid: false, message: "Full name must be at least 3 characters long" };
+  if (
+    typeof testimonialData.fullName !== "string" ||
+    testimonialData.fullName.trim().length < 3
+  ) {
+    return {
+      isValid: false,
+      message: "Full name must be at least 3 characters long",
+    };
   }
 
-  if (typeof testimonialData.address !== "string" || testimonialData.address.trim().length < 3) {
-    return { isValid: false, message: "Address must be at least 3 characters long" };
+  if (
+    typeof testimonialData.address !== "string" ||
+    testimonialData.address.trim().length < 3
+  ) {
+    return {
+      isValid: false,
+      message: "Address must be at least 3 characters long",
+    };
   }
 
   // Handle rating: Convert string to number if necessary
-  const rating = typeof testimonialData.rating === "string"
-    ? parseInt(testimonialData.rating, 10)
-    : testimonialData.rating;
+  const rating =
+    typeof testimonialData.rating === "string"
+      ? parseInt(testimonialData.rating, 10)
+      : testimonialData.rating;
 
   if (
     typeof rating !== "number" ||
@@ -847,26 +884,53 @@ export const validateAddTestimonialRequest = (
     rating < 1 ||
     rating > 5
   ) {
-    return { isValid: false, message: "Rating must be an integer between 1 and 5" };
+    return {
+      isValid: false,
+      message: "Rating must be an integer between 1 and 5",
+    };
   }
 
-  if (typeof testimonialData.description !== "string" || testimonialData.description.trim().length < 10) {
-    return { isValid: false, message: "Description must be at least 10 characters long" };
+  if (
+    typeof testimonialData.description !== "string" ||
+    testimonialData.description.trim().length < 10
+  ) {
+    return {
+      isValid: false,
+      message: "Description must be at least 10 characters long",
+    };
   }
 
-  if (typeof testimonialData.image !== "string" || testimonialData.image.trim().length === 0) {
-    return { isValid: false, message: "Image URL is required and cannot be empty" };
+  if (
+    typeof testimonialData.image !== "string" ||
+    testimonialData.image.trim().length === 0
+  ) {
+    return {
+      isValid: false,
+      message: "Image URL is required and cannot be empty",
+    };
   }
 
   if (testimonialData.slug !== undefined) {
-    if (typeof testimonialData.slug !== "string" || testimonialData.slug.trim().length === 0) {
-      return { isValid: false, message: "Slug must be a non-empty string if provided" };
+    if (
+      typeof testimonialData.slug !== "string" ||
+      testimonialData.slug.trim().length === 0
+    ) {
+      return {
+        isValid: false,
+        message: "Slug must be a non-empty string if provided",
+      };
     }
   }
 
   if (testimonialData.seoTitle !== undefined) {
-    if (typeof testimonialData.seoTitle !== "string" || testimonialData.seoTitle.trim().length > 60) {
-      return { isValid: false, message: "SEO title must not exceed 60 characters" };
+    if (
+      typeof testimonialData.seoTitle !== "string" ||
+      testimonialData.seoTitle.trim().length > 60
+    ) {
+      return {
+        isValid: false,
+        message: "SEO title must not exceed 60 characters",
+      };
     }
   }
 
@@ -875,13 +939,19 @@ export const validateAddTestimonialRequest = (
       typeof testimonialData.metaDescription !== "string" ||
       testimonialData.metaDescription.trim().length > 160
     ) {
-      return { isValid: false, message: "Meta description must not exceed 160 characters" };
+      return {
+        isValid: false,
+        message: "Meta description must not exceed 160 characters",
+      };
     }
   }
 
   if (testimonialData.metaKeywords !== undefined) {
     if (typeof testimonialData.metaKeywords !== "string") {
-      return { isValid: false, message: "Meta keywords must be a string if provided" };
+      return {
+        isValid: false,
+        message: "Meta keywords must be a string if provided",
+      };
     }
   }
 
@@ -942,5 +1012,177 @@ export const validateUpdateTestimonialRequest = (
     (testimonialData.image === undefined ||
       (typeof testimonialData.image === "string" &&
         testimonialData.image.length > 0))
+  );
+};
+
+export const validateAddFaqRequest = (
+  data: unknown,
+  role: string
+): data is AddFaqRequest => {
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const faqData = data as Partial<AddFaqRequest>;
+
+  return (
+    typeof faqData.question === "string" &&
+    validateName(faqData.question) &&
+    (faqData.slug === undefined ||
+      (typeof faqData.slug === "string" && validateSlug(faqData.slug))) &&
+    typeof faqData.answer === "string" &&
+    validateName(faqData.answer) &&
+    typeof faqData.seoTitle === "string" &&
+    faqData.seoTitle.trim().length > 0 &&
+    (faqData.seoTitle === undefined || typeof faqData.seoTitle === "string") &&
+    (faqData.metaDescription === undefined ||
+      typeof faqData.metaDescription === "string") &&
+    (faqData.metaKeywords === undefined ||
+      typeof faqData.metaKeywords === "string")
+  );
+};
+
+export const validateUpdateFaqRequest = (
+  data: unknown,
+  role: string
+): data is UpdateFaqRequest => {
+  // RBAC: Only admin and editor can update blogs
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const faqData = data as Partial<UpdateFaqRequest>;
+
+  if (
+    faqData.question === undefined &&
+    faqData.slug === undefined &&
+    faqData.answer === undefined &&
+    faqData.seoTitle === undefined &&
+    faqData.metaDescription === undefined &&
+    faqData.metaKeywords === undefined
+  ) {
+    return false;
+  }
+
+  return (
+    (faqData.question === undefined ||
+      (typeof faqData.question === "string" &&
+        validateName(faqData.question))) &&
+    (faqData.slug === undefined ||
+      (typeof faqData.slug === "string" && validateSlug(faqData.slug))) &&
+    (faqData.answer === undefined ||
+      (typeof faqData.answer === "string" && validateName(faqData.answer))) &&
+    (faqData.seoTitle === undefined || typeof faqData.seoTitle === "string") &&
+    (faqData.metaDescription === undefined ||
+      typeof faqData.metaDescription === "string") &&
+    (faqData.metaKeywords === undefined ||
+      typeof faqData.metaKeywords === "string")
+  );
+};
+
+export const validateAddBenefitRequest = (
+  data: unknown,
+  role: string
+): data is AddBenefitRequest => {
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const benefitData = data as Partial<AddBenefitRequest>;
+
+  return (
+    typeof benefitData.title === "string" &&
+    validateName(benefitData.title) &&
+    (benefitData.slug === undefined ||
+      (typeof benefitData.slug === "string" &&
+        validateSlug(benefitData.slug))) &&
+    typeof benefitData.description === "string" &&
+    validateName(benefitData.description) &&
+    (benefitData.seoTitle === undefined ||
+      typeof benefitData.seoTitle === "string") &&
+    (benefitData.metaDescription === undefined ||
+      typeof benefitData.metaDescription === "string") &&
+    (benefitData.metaKeywords === undefined ||
+      typeof benefitData.metaKeywords === "string")
+  );
+};
+
+export const validateUpdateBenefitRequest = (
+  data: unknown,
+  role: string
+): data is UpdateBenefitRequest => {
+  // RBAC: Only admin and editor can update blogs
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const benefitData = data as Partial<UpdateBenefitRequest>;
+
+  if (
+    benefitData.title === undefined &&
+    benefitData.slug === undefined &&
+    benefitData.description === undefined &&
+    benefitData.seoTitle === undefined &&
+    benefitData.metaDescription === undefined &&
+    benefitData.metaKeywords === undefined
+  ) {
+    return false;
+  }
+
+  return (
+    (benefitData.title === undefined ||
+      (typeof benefitData.title === "string" &&
+        validateName(benefitData.title))) &&
+    (benefitData.slug === undefined ||
+      (typeof benefitData.slug === "string" &&
+        validateSlug(benefitData.slug))) &&
+    (benefitData.description === undefined ||
+      (typeof benefitData.description === "string" &&
+        validateName(benefitData.description))) &&
+    (benefitData.seoTitle === undefined ||
+      typeof benefitData.seoTitle === "string") &&
+    (benefitData.metaDescription === undefined ||
+      typeof benefitData.metaDescription === "string") &&
+    (benefitData.metaKeywords === undefined ||
+      typeof benefitData.metaKeywords === "string")
+  );
+};
+
+export const validateAddContentRequest = (
+  data: unknown,
+  role: string
+): data is AddBannerRequest | AddPackageRequest => {
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const contentData = data as Partial<AddBannerRequest | AddPackageRequest>;
+
+  return (
+    (contentData.type === "banner" || contentData.type === "package") &&
+    typeof contentData.title === "string" &&
+    validateName(contentData.title) &&
+    typeof contentData.description === "string" &&
+    validateName(contentData.description) &&
+    (contentData.image === undefined ||
+      (typeof contentData.image === "string" && validateImage(contentData.image)))
+  );
+};
+
+export const validateUpdateContentRequest = (
+  data: unknown,
+  role: string
+): data is Partial<AddBannerRequest | AddPackageRequest> => {
+  if (!validateRole(role, "editor")) return false;
+  if (!data || typeof data !== "object") return false;
+  const contentData = data as Partial<AddBannerRequest | AddPackageRequest>;
+
+  if (
+    contentData.type === undefined &&
+    contentData.title === undefined &&
+    contentData.description === undefined &&
+    contentData.image === undefined
+  ) {
+    return false; // At least one field must be provided for update
+  }
+
+  return (
+    (contentData.type === undefined || contentData.type === "banner" || contentData.type === "package") &&
+    (contentData.title === undefined ||
+      (typeof contentData.title === "string" && validateName(contentData.title))) &&
+    (contentData.description === undefined ||
+      (typeof contentData.description === "string" && validateName(contentData.description))) &&
+    (contentData.image === undefined ||
+      (typeof contentData.image === "string" && validateImage(contentData.image)))
   );
 };

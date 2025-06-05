@@ -22,14 +22,25 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Ensure user is an admin
+    if (user.role !== "admin") {
+      return NextResponse.json(
+        {
+          error: true,
+          message: "Forbidden: Only admins can access orders",
+        } as ApiResponse,
+        { status: 403 }
+      );
+    }
+
     // Get query parameters for search and status filter
     const { searchParams } = new URL(req.url);
     const searchQuery = searchParams.get("search")?.trim() || "";
     const statusFilter = searchParams.get("status")?.toLowerCase() || "";
 
-    // Build query - only get orders for this customer
+    // Build query - only get orders placed by this admin
     const query: { _id?: ObjectId; status?: string; customerId: string } = {
-      customerId: user._id.toString() // Only get orders for this customer
+      customerId: user._id.toString() // Only get orders placed by this admin
     };
 
     // If search query is provided, try to use it as an order ID
@@ -124,4 +135,4 @@ function getStatusCode(status: string): number {
   };
 
   return statusMap[status.toLowerCase()] || 0;
-}
+} 

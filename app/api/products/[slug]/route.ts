@@ -17,6 +17,7 @@ interface LeanProduct {
   stock: number;
   description: string;
   benefit: string;
+  feature: boolean;
   seoTitle: string;
   metaDescription: string;
   metaKeywords: string;
@@ -76,6 +77,7 @@ export async function PATCH(req: NextRequest) {
       stock,
       description,
       benefit,
+      feature,
       seoTitle,
       metaDescription,
       metaKeywords,
@@ -96,6 +98,7 @@ export async function PATCH(req: NextRequest) {
     if (stock !== undefined) updateData.stock = stock;
     if (description) updateData.description = sanitizeInput(description);
     if (benefit) updateData.benefit = sanitizeInput(benefit);
+    if (feature !== undefined) updateData.feature = Boolean(feature);
     if (seoTitle) updateData.seoTitle = sanitizeInput(seoTitle);
     if (metaDescription)
       updateData.metaDescription = sanitizeInput(metaDescription);
@@ -262,10 +265,10 @@ export async function GET(
       );
     }
     const products = await Product.find({ slug })
-      .select("name slug category subcategory price stock description benefit seoTitle metaDescription metaKeywords images createdAt updatedAt")
-      .lean<LeanProduct | null>();
+      .select("name slug category subcategory price stock description benefit feature seoTitle metaDescription metaKeywords images createdAt updatedAt")
+      .lean<LeanProduct[]>();
 
-    if (!products) {
+    if (!products || products.length === 0) {
       return NextResponse.json(
         {
           error: true,
@@ -274,10 +277,16 @@ export async function GET(
         { status: 404 }
       );
     }
-    const responseData: ApiResponse<LeanProduct> = {
+
+    const sanitizedProducts = products.map(product => ({
+      ...product,
+      feature: Boolean(product.feature)
+    }));
+
+    const responseData: ApiResponse<LeanProduct[]> = {
       error: false,
       message: "Products retrieved successfully",
-      data: products,
+      data: sanitizedProducts,
     };
 
     return NextResponse.json(responseData, {

@@ -521,6 +521,9 @@ const ProductsPage = () => {
                       Meta Keywords
                     </TableHead>
                     <TableHead className="text-white/70 text-md">
+                      Feature
+                    </TableHead>
+                    <TableHead className="text-white/70 text-md">
                       Status
                     </TableHead>
                     {showActionsColumn && (
@@ -644,6 +647,17 @@ const ProductsPage = () => {
                               ? `${product.metaKeywords?.substring(0, 20)}...`
                               : product.metaKeywords
                             : ""}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className={`${
+                              product.feature
+                                ? "bg-purple-500/20 text-purple-400 hover:bg-purple-500/30"
+                                : "bg-gray-500/20 text-gray-400 hover:bg-gray-500/30"
+                            }`}
+                          >
+                            {product.feature ? "Feature" : "Regular"}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge
